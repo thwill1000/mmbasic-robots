@@ -1,0 +1,14 @@
+library delete
+
+load "graphics/hlt.csub"
+library save
+load "graphics/spr_csub.bas"
+library save
+load "graphics/tile0_csub.bas"
+library save
+load "graphics/tile1_csub.bas"
+library save
+load "graphics/tile2_csub.bas"
+library save
+
+run "pet8.bas"

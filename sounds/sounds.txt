@@ -1,0 +1,18 @@
+SFX Order in Mod File...
+
+Sample 1	sounds_dsbarexp
+Sample 2	sounds_dspistol
+Sample 3	sound_beep
+Sample 4	sound_beep2
+Sample 5	sound_cycle_item
+Sample 6	sound_cycle_weapon
+Sample 7	sound_door_faster
+Sample 8	sound_emp
+Sample 9	sound_error
+Sample 10	sound_found_item
+Sample 11	sound_magnet2
+Sample 12	sound_medkit
+Sample 13	sound_move
+Sample 14	sound_plasma_faster
+Sample 15	sound_shock
+Sample 16	sounds_dsbarexp
