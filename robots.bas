@@ -15,6 +15,7 @@
   'get world map
   loadworld
   loadindex
+  load_comments
   
   'startup defines
   
@@ -30,6 +31,8 @@
   '  xp=Asc(Left$(ulx$,1)):yp=Asc(Left$(uly$,1))
   xp=ux(0):yp=uy(0)
   'xp and yp are used parallel to ux(0) and uy(0)
+
+  textc=rgb(green):bckgnd=rgb(myrtle)
   
   
   'write initial world
@@ -45,6 +48,8 @@
   pl_mv=0        'walking move 0..4
   pl_wp=0        'weapon holding (0=none, 1=pistol, 2=plasma
   pl_md=0        'player mode (0=walk/fight, 1=search, 2=move)
+  pl_it=0        'player item
+  pl_ky=7        'player has all 3 keys
   writeplayer_m(0,0,pl_wp)
   
  
@@ -58,33 +63,43 @@
     'player controls movement of player character
     v=(ky=129)-(ky=128)
     h=(ky=131)-(ky=130)
-    If h+v<>0 Then                  'when move key pressed
-      if pl_md=0 then
+    If h+v<>0 Then                    'when move key pressed
+
+      if pl_md=0 then                 'in move mode, move
         'check if we can walk, then walk
         If (get_ta(xp+h,yp+v) And b_wlk) Then
           xp=xp+h:yp=yp+v             'new player position
           xp=Min(Max(xp,5),hsize-6)   'don't fall off the map
           yp=Min(Max(yp,3),vsize-4)
           store_unit_pos(0,xp,yp)     'store pos for future use
-          writeworld_m(xsm,ysm)       'scroll world
+'          writeworld_m(xsm,ysm)       'scroll world
           writeplayer_m(h,v,pl_wp)    'update player tile
-          'text 0,0,hex$(xp)+" "+hex$(yp)
         EndIf
       endif
       
-      if pl_md=1 then
-        text 150,0,"search" 
-        pl_md=0
-      endif
-      
-      if pl_md=2 then
-        text 150,0,"move"
-        pl_md=0
-      endif
     EndIf
+
+    framebuffer write l   'this will be come part of the main items routine
+
+    'just testing mode changes
+    if pl_md=1 then
+      text 150,0,"search",,,,textc,bckgnd 
+      pl_md=0
+    endif
+      
+    if pl_md=2 then
+      text 150,0," move ",,,,textc,bckgnd
+      pl_md=0
+    endif
+
     
     'investigate AI UNITs status and activate and process
     scan_UNITS
+
+    'update player
+    update_player
+
+    framebuffer write l   'this will be come part of the main items routine
     
     'development support, for debugging
     If ky=27 Then 'esc
@@ -92,15 +107,22 @@
       Save image "pet.bmp"
     EndIf
     
-    'debug weapen sprites
-    if ky=32 then
+    'debug key sprites with o
+    if k$="o" then
+      show_keys
+    end if
+
+    'debug weapen sprites with p
+    if k$="p" then
       pl_wp=(pl_wp+1) mod 3
       writeplayer_m(h,v,pl_wp)
-      if pl_wp>0 then
-        Sprite compressed item_index(pl_wp-1),272,33
-      else  
-        box 272,33,48,24,1,rgb(myrtle),rgb(myrtle)
-      end if
+      show_weapon
+    end if
+
+    'debug items sprites with i
+    if k$="i" then
+      pl_it=(pl_it+1) mod 5
+      show_item
     end if
     
     'examine/search mode
@@ -108,13 +130,64 @@
     
     'move object mode
     if k$="m" then pl_md=2
+
+    show_comments(0)
+
+    'after all processing, update the visible screen area
+    writeworld_m(xsm,ysm)       
     
     Pause 50
   Loop Until k$="q"   'quit when q is pressed
   
   Memory
 End
+
+sub show_keys
+  local i
+  for i=0 to 2
+    if pl_ky and 1<<i then
+      Sprite compressed key_index(i),271+16*i,124
+    end if
+  next
+end sub
+
+
+sub show_weapon
+      if pl_wp>0 then
+        Sprite compressed item_index(pl_wp-1),272,38
+        text 272,32,itemz$(pl_wp-1),,,,textc,bckgnd
+        text 272,54,str$(100,3,0),,,,textc,bckgnd
+      else  
+        box 272,32,48,30,1,bckgnd,bckgnd
+      end if
+end sub
+
+sub show_item
+      if pl_it>0 then
+        Sprite compressed item_index(pl_it+1),272,80+4
+        text 272,72,itemz$(pl_it+1),,,,textc,bckgnd
+      else  
+        box 272,72,48,36,1,bckgnd,bckgnd
+      end if
+end sub
   
+sub update_player
+  local i
+  ux(0)=xp:uy(0)=yp
+  if oldhealth<>uh(0) then
+    framebuffer write l
+    Sprite compressed health_index(int((12-uh(0))/2)),272,160
+    oldhealth=uh(0)
+    for i=1 to oldhealth
+      if i > oldhealth then
+        box 267+4*i,220,3,5,1,bckgnd
+      else 
+        box 267+4*i,220,3,5,1,textc,textc
+      end if
+    next
+  end if
+end sub
+
   
   'this is the main AI loop where AI all units are processed
 sub scan_UNITS
@@ -129,8 +202,8 @@ sub scan_UNITS
     if unit_type=10 then             'this is a door
       dx=ux(i):dy=uy(i)
       nearx=abs(dx-xp):neary=abs(dy-yp)
-      if nearx+neary<3 then           'we are close to the door, ignore any other
-        if nearx+neary=1 then         'operate door
+      if nearx<4 and neary<4 then           'we are close to the door, ignore any other
+        if nearx<2 and neary<2 then         'operate door
           open_door(i,dx,dy)
         else if nearx=0 and neary=0 then
           'do nothing
@@ -180,7 +253,7 @@ sub anim_v_door (dx,dy,a,b,c)
   mid$(lv$(dy-1),dx+1,1)=chr$(a)
   mid$(lv$(dy),dx+1,1)=chr$(b)
   mid$(lv$(dy+1),dx+1,1)=chr$(c)
-  writeworld_m(2,2)   'only repaint relevant section of screen
+'  writeworld_m(2,3)   'only repaint relevant section of screen
 end sub
   
   
@@ -189,7 +262,7 @@ sub anim_h_door (dx,dy,a,b,c)
   mid$(lv$(dy),dx,1)=chr$(a)
   mid$(lv$(dy),dx+1,1)=chr$(b)
   mid$(lv$(dy),dx+2,1)=chr$(c)
-  writeworld_m(2,2)   'only repaint relevant section of screen
+'  writeworld_m(3,2)   'only repaint relevant section of screen
 end sub
   
   
@@ -230,7 +303,22 @@ Function get_ta(x,y)
   til=Asc(Mid$(lv$(y),x+1,1))
   get_ta = Asc(Mid$(ta$,til+1,1))
 End Function
-  
+
+sub load_comments
+  'dummy for now
+  dim txt$(1,3)
+  txt$(0,0)="press p to cycle weapons"
+  txt$(0,1)="press i to cycle items"
+  txt$(0,2)="press o to show cards"
+  txt$(0,3)="cursor keys to move"
+end sub
+
+sub show_comments(x)
+  local i
+  for i=0 to 3
+    text 20,200+10*i,txt$(x,i),,,,textc,bckgnd
+  next
+end sub  
   
   'loads the world map and tile attributes and unit attributes
 Sub loadworld
@@ -283,9 +371,8 @@ Sub loadworld
   'h/v=closed     h0 h1 h2 h3  v0 v1 v2 v3
   dim dpm(3,1) = (82,92,93,94, 68,71,75,79)
 
-  'load weapons in layer N behind the frame in L
-  'framebuffer write N
-  'load image "images/items.bmp",272,100
+  'item names
+  dim itemz$(5) length 6 = ("pistol","plasma","medkit"," emp  ","magnet"," bomb ")
   
 End Sub
   
