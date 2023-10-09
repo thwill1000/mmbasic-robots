@@ -1,51 +1,58 @@
   'petrobot testbed picomite VGA V50708RC4
-  
-  
+'@add by Martin
+
   ' system setup -----------------------------------------------------
-  
+
   MODE 2
   Option default integer
   FRAMEBUFFER layer
-  
+  '@add by Martin
+  Font 9
+ 
   'startup screen show on N
-  '  Load image "images/introscreen.bmp"
-  '  Pause 1000
-  '  CLS
-  
+    Load image "images/introscreen.bmp",0,20
+	'@add by Martin
+	'read color values
+	
+    Dim Col%(15):Restore colors:For f=1 To 15:Read Col%(f):Next f
+    Pause 2000
+    CLS
+
   'get world map
   loadworld
   loadindex
-  
-  
-  
+
+
+
   'startup defines ---------------------------------------------------
-  
+
   'heartbeat
-  const h_beat = 120 'ms
-  
+  Const h_beat = 120 'ms
+
   'define some constants
-  const b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1   'attribute flags
-  const p_w=0,p_s1=1,p_m1=2,p_m2=3       'player modes walk, search, move1+2
-  
+  Const b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1   'attribute flags
+  Const p_w=0,p_s1=1,p_m1=2,p_m2=3       'player modes walk, search, move1+2
+
   'defines
-  const hsize=128,vsize=64  'world map 128x64
-  const xm=5:ym=3           'view window on map # of tiles E-w and N-S
-  const xs=5*24:ys=4*24     'window centre with 24*24 tile reference
-  
+  Const hsize=128,vsize=64  'world map 128x64
+  Const xm=5:ym=3           'view window on map # of tiles E-w and N-S
+  Const xs=5*24:ys=4*24     'window centre with 24*24 tile reference
+
   'start positions player in map in # tiles
   xp=UX(0):yp=UY(0)   'xp and yp are used parallel to UX(0) and UY(0)
-  
+
   'default search/view mode = off
   view_ph=15          'nothing to search
-  
+
   textc=RGB(green):bckgnd=RGB(myrtle)
-  
+
   'write frame
-  Load image "images/layer.bmp"
-  
+'@changed by Martin
+  Load image "images/layerb.bmp"
+
   'write initial world
   writeworld_m(xm,ym)
-  
+
   'initial player attributes
   pl_sp=0        'default player is facing you
   pl_mv=0        'walking move 0..4
@@ -53,7 +60,7 @@
   pl_md=0        'player mode (0=walk/fight, 1=search, 2,3=move)
   pl_it=0        'player item
   writeplayer_m(0,0,pl_wp)
-  
+
   'init inventory
   pl_ky=7'0        'player has all 3 keys
   pl_pa=0         'gun ammo
@@ -62,24 +69,24 @@
   pl_em=0         '#EMP
   pl_mk=0         'medkit
   pl_ma=0         '#magnets
-  
-  
-  
+
+
+
   'main player input loop -----------------------------------------
   Do
     'check response
-    text 290,0,right$("00"+str$(timer,3,0),3)
-do:loop until timer>h_beat
-    timer=0
-    
+    Text 290,0,Right$("00"+Str$(Timer,3,0),3)
+Do :Loop Until Timer>h_beat
+    Timer =0
+
     'player input through keyboard
     k$=Inkey$:ky=Asc(k$)
-    
+
     'player controls movement of player character
     v=(ky=129)-(ky=128)
     h=(ky=131)-(ky=130)
     If h+v<>0 Then                    'when move key pressed
-      
+
       If pl_md=p_w Then                 'in move mode, move
         'check if we can walk, then walk
         If (get_ta(xp+h,yp+v) And b_wlk) Then
@@ -90,10 +97,10 @@ do:loop until timer>h_beat
           writeplayer_m(h,v,pl_wp)    'update player tile
         EndIf
       EndIf
-      
+
       'executing the search mode, player facing search direction
       If view_ph<4 Then view_ph=5:writeplayer_m(h,v,pl_wp)
-      
+
       'If pl_md=p_m2 Then
       'Text 150,0," move2 ",,,,textc,bckgnd
       'exec_move
@@ -103,28 +110,28 @@ do:loop until timer>h_beat
       'show_move
       'pl_md=p_m2
       'EndIf
-      
+
     EndIf
-    
+
     'investigate AI UNITs status and activate and process
     scan_UNITS
-    
+
     'update player
     update_player
-    
+
     'animations
-    if view_ph<14 then
-      if view_ph<4 then show_viewer
-      if view_ph>4 then anim_viewer
-    end if
-    
+    If view_ph<14 Then
+      If view_ph<4 Then show_viewer
+      If view_ph>4 Then anim_viewer
+    EndIf
+
     'change player mode
     If k$="z" Then pl_md=p_s1:view_ph=0
     'If k$="m" Then pl_md=p_m1:show_move
-    
-    
+
+
     'development support, for debugging ---------------------------
-    If ky=27 Then 'esc
+    If k$=Chr$(27) Then 'esc
       Save image "pet.bmp"
     EndIf
     If k$="o" Then
@@ -140,65 +147,65 @@ do:loop until timer>h_beat
       show_item
     EndIf
     'end debug commands ------------------------------------------
-    
+
     'update the world in the viewing window
     writeworld_m(xm,ym)       'scroll world
-    
-    
+
+
   Loop Until k$="q"   'quit when q is pressed
-  
-  mode 1
+
+  MODE 1
   Memory
 End
-  
-  
-  
+
+
+
   ' screen oriented subs ------------------------------------------
-sub show_viewer
+Sub show_viewer
   'show player phase 1,2,3 looking glass phase 0
-  framebuffer write l
-  select case view_ph
-    case 0
-      sprite compressed sprite_index(&h53),xs,ys  'over player
-    case 1
+  FRAMEBUFFER write l
+  Select Case view_ph
+    Case 0
+      Sprite compressed sprite_index(&h53),xs,ys  'over player
+    Case 1
       writeplayer_m(0,0,pl_wp)                    'restore player
-  end select
-  view_ph=(view_ph+1) mod 4
-  framebuffer write n
-end sub
-  
-  
-sub anim_viewer
-  framebuffer write l
-  if view_ph=5 then
+  End Select
+  view_ph=(view_ph+1) Mod 4
+  FRAMEBUFFER write n
+End Sub
+
+
+Sub anim_viewer
+  FRAMEBUFFER write l
+  If view_ph=5 Then
     v1=v:h1=h:v2=36*v1+ys:h2=36*h1+xs
-  end if
-  
+  EndIf
+
   'use v2 and h2 to determine the search area
-  select case view_ph
-    case 8,12
-      box h2+12,v2-12,24,24,1,0,0
-      sprite compressed sprite_index(&h53),h2+12,v2+12
-    case 7,11
-      box h2-12,v2-12,24,24,1,0,0
-      sprite compressed sprite_index(&h53),h2+12,v2-12
-    case 6,10
-      box h2-12,v2+12,24,24,1,0,0
-      sprite compressed sprite_index(&h53),h2-12,v2-12
-    case 5,9
-      box h2+12,v2+12,24,24,1,0,0
-      sprite compressed sprite_index(&h53),h2-12,v2+12
-    case 13
-      box h2+12,v2+12,24,24,1,0,0
-  end select
-  framebuffer write n
-  inc view_ph,1
-  if view_ph=14 then exec_viewer
-end sub
-  
-sub show_move
-end sub
-  
+  Select Case view_ph
+    Case 8,12
+      Box h2+12,v2-12,24,24,1,0,0
+      Sprite compressed sprite_index(&h53),h2+12,v2+12
+    Case 7,11
+      Box h2-12,v2-12,24,24,1,0,0
+      Sprite compressed sprite_index(&h53),h2+12,v2-12
+    Case 6,10
+      Box h2-12,v2+12,24,24,1,0,0
+      Sprite compressed sprite_index(&h53),h2-12,v2-12
+    Case 5,9
+      Box h2+12,v2+12,24,24,1,0,0
+      Sprite compressed sprite_index(&h53),h2-12,v2+12
+    Case 13
+      Box h2+12,v2+12,24,24,1,0,0
+  End Select
+  FRAMEBUFFER write n
+  Inc view_ph,1
+  If view_ph=14 Then exec_viewer
+End Sub
+
+Sub show_move
+End Sub
+
 Sub show_keys
   Local i
   For i=0 To 2
@@ -208,47 +215,47 @@ Sub show_keys
   Next
 End Sub
   '  Dim hidden$(6) length 6 = ("key","bomb","emp","pistol","plasma","medkit","magnet")
-  
+
 Sub show_weapon
   If pl_wp>0 Then
     Sprite compressed item_index(pl_wp-1),272,38
     Text 272,32,hidden$(pl_wp+2),,,,textc,bckgnd
-    select case pl_wp
-      case 1
+    Select Case pl_wp
+      Case 1
         Text 272,54,Str$(pl_pa,3,0),,,,textc,bckgnd
-      case 2
+      Case 2
         Text 272,54,Str$(pl_ps,3,0),,,,textc,bckgnd
-    end select
+    End Select
   Else
     Box 272,32,48,30,1,bckgnd,bckgnd
   EndIf
 End Sub
-  
+
 Sub show_item
   If pl_it>0 Then
-    local a$,b$
+    Local a$,b$
     Sprite compressed item_index(pl_it+1),272,81
-    select case pl_it
-      case 1'medkit
+    Select Case pl_it
+      Case 1'medkit
         a$="medkit"
-        b$=str$(pl_mk,3,0)
-      case 2'emp
+        b$=Str$(pl_mk,3,0)
+      Case 2'emp
         a$="emp   "
-        b$=str$(pl_em,3,0)
-      case 3'magnet
+        b$=Str$(pl_em,3,0)
+      Case 3'magnet
         a$="magnet"
-        b$=str$(pl_ma,3,0)
-      case 4'bomb
+        b$=Str$(pl_ma,3,0)
+      Case 4'bomb
         a$="bomb  "
-        b$=str$(pl_bo,3,0)
-    end select
-    Text 272,72,a$,,,,textc,bckgnd
-    Text 272,104,b$,,,,textc,bckgnd
+        b$=Str$(pl_bo,3,0)
+    End Select
+    Text 272,72,a$,,,,textc,0
+    Text 272,104,b$,,,,textc,0
   Else
-    Box 272,72,48,39,1,bckgnd,bckgnd
+    Box 272,72,48,39,1,bckgnd,0
   EndIf
 End Sub
-  
+
 Sub update_player
   Local i
   UX(0)=xp:UY(0)=yp
@@ -264,7 +271,7 @@ Sub update_player
     Next
   EndIf
 End Sub
-  
+
   'write player from sprites in library
 Sub writeplayer_m(h,v,w)
   'write player on layer L
@@ -275,7 +282,7 @@ Sub writeplayer_m(h,v,w)
   pl_mv=(pl_mv+1) Mod 4
   FRAMEBUFFER write n
 End Sub
-  
+
   'uses tiles stored in library to build up screen
 Sub writeworld_m(xm,ym)
   For xn=-xm To xm
@@ -288,33 +295,33 @@ Sub writeworld_m(xm,ym)
     Next
   Next
 End Sub
-  
-  
-  
-  
+
+
+
+
   'AI oriented sub ---------------------------------------------------
   'this is the main AI loop where AI all units are processed
 Sub scan_UNITS
   Local i,dx,dy,nearx,neary
   For i=1 To 47                       'unit 0 = player, skip player
     unit_type=UT(i)
-    
+
     'here we branch to different units
-    
+
     'this section handles automatic doors
     If unit_type=10 Then              'this is a door
       dx=UX(i):dy=UY(i)
       nearx=Abs(dx-xp):neary=Abs(dy-yp)
-      If nearx<2 and neary<2 Then   'operate door
+      If nearx<2 And neary<2 Then   'operate door
         open_door(i,dx,dy)
       Else                          'we are far enough so close the door
         close_door(i,dx,dy)
       EndIf
     EndIf
-    
+
   Next i
 End Sub
-  
+
   'door is closed, and is open at the end of this animation
 Sub open_door(i,dx,dy)
   Local u_b=UB(i)
@@ -328,7 +335,7 @@ Sub open_door(i,dx,dy)
     If u_b=5 Then anim_h_door(dx,dy,84,85,86):UB(i)=0
   EndIf
 End Sub
-  
+
   'door is open, and is closed at the end of this animation
 Sub close_door(i,dx,dy)
   Local u_b=UB(i)
@@ -342,7 +349,7 @@ Sub close_door(i,dx,dy)
     If u_b=2 Then anim_h_door(dx,dy,88,89,86):UB(i)=3
   EndIf
 End Sub
-  
+
   'update the world map with the current vertical door tiles
 Sub anim_v_door(dx,dy,a,b,c)
   MID$(lv$(dy-1),dx+1,1)=Chr$(a)
@@ -350,7 +357,7 @@ Sub anim_v_door(dx,dy,a,b,c)
   MID$(lv$(dy+1),dx+1,1)=Chr$(c)
   writeworld_m(2,2)   'only repaint relevant section of screen
 End Sub
-  
+
   'update the world map with the current horizontal door tiles
 Sub anim_h_door(dx,dy,a,b,c)
   MID$(lv$(dy),dx,1)=Chr$(a)
@@ -358,55 +365,55 @@ Sub anim_h_door(dx,dy,a,b,c)
   MID$(lv$(dy),dx+2,1)=Chr$(c)
   writeworld_m(2,2)   'only repaint relevant section of screen
 End Sub
-  
-  
+
+
   'subs to support player handling ------------------------------------
-sub exec_viewer
+Sub exec_viewer
   'do things
-  local i,j,a$="Nothing found"
-  for i=48 to 63 'hidden units
-    if UT(i)>127 then
-      if UX(i)=xp+h1 or UX(i)+UC(i)=xp+h1 then
-        if UY(i)=yp+v1 or UY(i)+UD(i)=yp+v1 then
+  Local i,j,a$="Nothing found"
+  For i=48 To 63 'hidden units
+    If UT(i)>127 Then
+      If UX(i)=xp+h1 Or UX(i)+UC(i)=xp+h1 Then
+        If UY(i)=yp+v1 Or UY(i)+UD(i)=yp+v1 Then
           'found hidden item
           UT(i)=UT(i)-128   'mark it as found
-          a$="found "+hidden$(UT(i))+" ammo "+str$(UA(i))
+          a$="found "+hidden$(UT(i))+" ammo "+Str$(UA(i))
           writecomment(a$)
           'add it to the inventory
-          select case UT(i)
-            case 0'key
-              pl_ky=pl_ky or UA(i)
-            case 1'bomb
-              inc pl_bo,UA(i)
-            case 2'emp
-              inc pl_emp,UA(i)
-            case 3'pistol
-              inc pl_pa,UA(i)
-            case 4'plasma
-              inc pl_ps,UA(i)
-            case 5'medkit
-              inc pl_mk,UA(i)
-            case 6'magnet
-              inc pl_ma,UA(i)
-          end select
+          Select Case UT(i)
+            Case 0'key
+              pl_ky=pl_ky Or UA(i)
+            Case 1'bomb
+              Inc pl_bo,UA(i)
+            Case 2'emp
+              Inc pl_emp,UA(i)
+            Case 3'pistol
+              Inc pl_pa,UA(i)
+            Case 4'plasma
+              Inc pl_ps,UA(i)
+            Case 5'medkit
+              Inc pl_mk,UA(i)
+            Case 6'magnet
+              Inc pl_ma,UA(i)
+          End Select
           'if closed box, then open box
-          j=asc(mid$(lv$(yp+v1),xp+h1+1,1))
-          if j=&h29 then j=&h2A
-          if j=&hC7 then j=&hC6
-          mid$(lv$(yp+v1),xp+h1+1,1)=chr$(j)
-        end if
-      end if
-    end if
-  end if
-next
-if a$="Nothing found" then writecomment(a$)
+          j=Asc(Mid$(lv$(yp+v1),xp+h1+1,1))
+          If j=&h29 Then j=&h2A
+          If j=&hC7 Then j=&hC6
+          MID$(lv$(yp+v1),xp+h1+1,1)=Chr$(j)
+        EndIf
+      EndIf
+    EndIf
+  EndIf
+Next
+If a$="Nothing found" Then writecomment(a$)
 pl_md=p_w     'at the end, free player
-end sub
+End Sub
 
-sub exec_move
+Sub exec_move
 'do things
 pl_md=p_w     'at the end, free player
-end sub
+End Sub
 
 
 'generic subs for gameplay -------------------------------------------
@@ -423,16 +430,34 @@ get_ta = Asc(Mid$(ta$,til+1,1))
 End Function
 
 'write text in the comment area at bottom screen rolling upwards
-sub writecomment (a$)
-local i
-for i=0 to 2:comment$(i)=comment$(i+1):next
-comment$(3)=left$(a$+space$(30),30)
-for i = 0 to 3
-  text 10,200+10*i,comment$(i),,,,textc,bckgnd
-next i
-end sub
+Sub writecomment(a$)
+Local i
+a$=UCase$(a$)
+For i=0 To 2:comment$(i)=comment$(i+1):Next
+comment$(3)=Left$(a$+Space$(30),30)
+For i = 0 To 3
+'@changed by Martin
+  Text 10,200+10*i,comment$(i),,,,textc,0:'bckgnd
+Next i
+End Sub
 
-
+'@add by Martin
+' -----------------------------------
+' Level LiveMap Preview
+' -----------------------------------
+Sub renderLiveMap
+ Local integer mx,my,mp,yy,CL(256)
+ Local t$
+ 'Tile colors
+    T$="00077777977770777770000A0000B0006740694B66EB60E777E722B724B66070"
+ T$=T$+"0367000700770007770000700707077880000007776777077707770778888887"
+ T$=T$+"7067700770000007700400000000000000000730073000000000000000000000"
+ T$=T$+"0007700770898EEAAA233867772777677700A00AA0000000000000000000000"
+ For mx=1 To 255:CL(mx)=col%(Val("&H"+Mid$(T$,mx,1))):Next
+ For my = 0 To 64:mp=Peek(varaddr lv$(my)):yy=44+(my<<1)
+   For mx = 1 To 128:Box 4+2*mx,yy,2,2,,CL(Peek(BYTE mp+mx)):Next
+ Next
+End Sub
 
 
 ' subs for game setup -------------------------------------------------
@@ -492,8 +517,8 @@ Dim itemz$(5) length 6 = ("pistol","plasma","medkit"," emp  ","magnet"," bomb ")
 Dim hidden$(6) length 6 = ("key","bomb","emp","pistol","plasma","medkit","magnet")
 
 'empty comment string
-dim comment$(3) length 30
-for i=0 to 3:comment$(i)=space$(30):next
+Dim comment$(3) length 30
+For i=0 To 3:comment$(i)=Space$(30):Next
 
 End Sub
 
@@ -576,4 +601,43 @@ Close #1
 
 End Sub
 
->
+'@add by Martin
+colors:
+'--Colorscheme accordung to Spritecolors
+Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
+Data RGB(MAGENTA),RGB(YELLOW),RGB(WHITE),RGB(MYRTLE)
+Data RGB(COBALT) ,RGB(MIDGREEN),RGB(CERULEAN),RGB(RUST)
+Data RGB(FUCHSIA),RGB(BROWN),RGB(LILAC)
+
+
+' C64_PetsciiRobotsFont  Martin Herhaus
+' Font type    : Full (96 Characters)
+' Font size    : 8x8 pixels
+' Memory usage : 768
+DefineFont #9
+60200808
+00000000 00000000 38383838 00380038 8844EEEE 00000000 62FF6200 0062FF62
+FEC0F61C 0070DE06 381CEEE6 00CEEE70 7EE0E4FC 00FEE4E4 20103838 00000000
+10100804 00040810 08081020 00201008 3C7E1800 0000187E FE383800 00003838
+00000000 20103838 7E000000 00000000 00000000 00383800 381C0E06 00C0E070
+C6C2C2FE 00FE8686 10101030 007C7C10 FE0202FE 00FEC0C0 FE0404FC 00FE0606
+C6C6C0C0 000606FE FE8080FE 00FE0606 FE808CFC 00FE8686 3E0202FE 00303030
+FE4C4C7C 00FEC6C6 FE8686FE 00060606 00383800 00003838 00383800 20103838
+70381C0E 000E1C38 007E0000 0000007E 0E1C3870 0070381C 3E0ECEFE 00300030
+41899576 36494122 FE46467E 00868686 FE8C8CFC 00FE8686 808686FE 00FE8282
+C68484FC 00FEC6C6 FE8080FE 00FEC0C0 FEC080FE 00C0C0C0 9E8082FE 00FE8686
+FE868686 00868686 1810107E 007E1818 06040404 00FE8686 F8848282 0086868C
+C0404040 00FEC0C0 8696AEC6 00868686 9EB6E6C6 0086868E 868282FE 00FE8686
+FE8282FE 00C0C0C0 C4C4C4FC 00F6CECC FE8C8CFC 00C6C6C6 FEC0C2FE 00FEC202
+1818187E 00181818 86868686 00FE8686 86868686 00385C8E 86868686 00C6AE96
+7CC2C2C2 00868686 7E464646 00181818 380C06FE 00FEC060 10100804 00040810
+3870E0C0 00060E1C 08081020 00201008 38381010 0000006C 00000000 FF000000
+FC40623C 00FEE0E0 86FE0000 00F68E86 C2FEC0C0 00FEE2C2 C2FE0000 00FEE2C0
+86FE0606 00FE8E86 C2FE0000 00FEE0FE C0C03E00 00E0E0F8 86FE0000 FE0EFE86
+C2FEC0C0 00E2E2C2 1838001C 001C1C18 0C0C000C FE8E0E0C 86868080 008E8EFC
+18181838 001C1C18 C2FE0000 00EAEACA C2FE0000 00E2E2C2 86FE0000 00FE8E86
+C2FE0000 E0E0FEC2 8EFE0000 0E0EFE8E C2FE0000 00E0E0C0 C0FE0000 00FE0EFE
+C0F8C0C0 00FEE2C0 86860000 00FE8E86 C2C20000 0070E8C4 CACA0000 00FEE2CA
+74E20000 008E5C38 86860000 FE0EFE86 06FE0000 00FEE0FE B838383A 003A3838
+38383838 00383838 3E3838B8 00B83838 AA55AA55 AA55AA55 B195423C 3C4295B1
+End DefineFont
