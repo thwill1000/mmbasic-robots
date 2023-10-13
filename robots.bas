@@ -1,12 +1,12 @@
   'petrobot testbed picomite VGA V50708RC4
-  
-  
+
+
   ' system setup -----------------------------------------------------
-  
+
   MODE 2
   Option default integer
   FRAMEBUFFER layer
-  
+
   'startup screen show on N
   Play stop:Play modfile "Music\metal_heads.mod"
   Load image "images/introscreen.bmp",0,20   'startup screen show on N
@@ -14,43 +14,43 @@
   Do :Loop Until Inkey$=" "
   preload_SFX
   CLS
-  
+
   'get world map
   loadworld
   loadindex
-  
-  
-  
+
+
+
   'startup defines ---------------------------------------------------
-  
+
   'heartbeat
   Const h_beat = 120 'ms
-  
+
   'define some constants
   Const b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1   'attribute flags
   Const p_w=0,p_s1=1,p_m1=2,p_m2=3       'player modes walk, search, move1+2
-  
+
   'defines
   Const hsize=128,vsize=64  'world map 128x64
   Const xm=5:ym=3           'view window on map # of tiles E-w and N-S
   Const xs=5*24:ys=4*24     'window centre with 24*24 tile reference
-  
+
   'start positions player in map in # tiles
   xp=UX(0):yp=UY(0)   'xp and yp are used parallel to UX(0) and UY(0)
-  
+
   'default search/view mode = off
   view_ph=15          'nothing to search
-  
+
   'default text settings
-  font 9
+  Font 9
   textc=RGB(green):bckgnd=0'black
-  
+
   'write frame
   Load image "images/layerb.bmp"
-  
+
   'write initial world
   writeworld_m(xm,ym)
-  
+
   'initial player attributes
   pl_sp=0        'default player is facing you
   pl_mv=0        'walking move 0..4
@@ -58,7 +58,7 @@
   pl_md=0        'player mode (0=walk/fight, 1=search, 2,3=move)
   pl_it=0        'player item
   writeplayer_m(0,0,pl_wp)
-  
+
   'init inventory
   pl_ky=0 '7        'player has all 3 keys
   pl_pa=0         'gun ammo
@@ -67,24 +67,26 @@
   pl_em=0         '#EMP
   pl_mk=0         'medkit
   pl_ma=0         '#magnets
-  
-  
-  
+
+
+ani_timer=1
+
+
   'main player input loop -----------------------------------------
   Do
     'check response
     Text 290,0,Right$("00"+Str$(Timer,3,0),3)
     Do :Loop Until Timer>h_beat
     Timer =0
-    
+
     'player input through keyboard
     k$=Inkey$:ky=Asc(k$)
-    
+
     'player controls movement of player character
     v=(ky=129)-(ky=128)
     h=(ky=131)-(ky=130)
     If h+v<>0 Then                    'when move key pressed
-      
+
       If pl_md=p_w Then                 'in move mode, move
         'check if we can walk, then walk
         If (get_ta(xp+h,yp+v) And b_wlk) Then
@@ -95,10 +97,10 @@
           writeplayer_m(h,v,pl_wp)    'update player tile
         EndIf
       EndIf
-      
+
       'executing the search mode, player facing search direction
       If view_ph<4 Then view_ph=5:writeplayer_m(h,v,pl_wp)
-      
+
       'If pl_md=p_m2 Then
       'Text 150,0," move2 ",,,,textc,bckgnd
       'exec_move
@@ -108,26 +110,26 @@
       'show_move
       'pl_md=p_m2
       'EndIf
-      
+
     EndIf
-    
+
     'investigate AI UNITs status and activate and process
     scan_UNITS
-    
+
     'update player
     update_player
-    
+
     'animations
     If view_ph<14 Then
       If view_ph<4 Then show_viewer
       If view_ph>4 Then anim_viewer
     EndIf
-    
+
     'change player mode
     If k$="z" Then pl_md=p_s1:view_ph=0
     'If k$="m" Then pl_md=p_m1:show_move
-    
-    
+
+
     'development support, for debugging ---------------------------
     If ky=27 Then 'esc
       Save image "pet.bmp"
@@ -145,22 +147,22 @@
       show_item
     EndIf
     'end debug commands ------------------------------------------
-    
+
     'update the world in the viewing window
     writeworld_m(xm,ym)       'scroll world
-    
-    
+    Ani_Tiles     'change the animated Tiles
+
   Loop Until k$="q"   'quit when q is pressed
-  
+
   MODE 1
   Memory
 End
-  
-  
-  
+
+
+
   ' screen oriented subs ------------------------------------------
 
-'show player phase 1,2,3 looking glass phase 0  
+'show player phase 1,2,3 looking glass phase 0
 Sub show_viewer
   FRAMEBUFFER write l
   Select Case view_ph
@@ -172,14 +174,14 @@ Sub show_viewer
   view_ph=(view_ph+1) Mod 4
   FRAMEBUFFER write n
 End Sub
-  
+
   'show the looking glass over the search area
 Sub anim_viewer
   FRAMEBUFFER write l
   If view_ph=5 Then
     v1=v:h1=h:v2=30*v1+ys:h2=30*h1+xs
   EndIf
-  
+
   'use v2 and h2 to determine the search area
   Select Case view_ph
     Case 8,12
@@ -202,10 +204,10 @@ Sub anim_viewer
   If view_ph=14 Then exec_viewer
 End Sub
 
-'show the hand tile over the player   
+'show the hand tile over the player
 Sub show_move
 End Sub
-  
+
   'show keys in frame
 Sub show_keys
   Local i
@@ -215,7 +217,7 @@ Sub show_keys
     EndIf
   Next
 End Sub
-  
+
   'show weapon in frame
 Sub show_weapon
   If pl_wp>0 Then
@@ -231,7 +233,7 @@ Sub show_weapon
     Box 272,32,48,30,1,bckgnd,bckgnd
   EndIf
 End Sub
-  
+
   'show item in frame
 Sub show_item
   If pl_it>0 Then
@@ -257,7 +259,7 @@ Sub show_item
     Box 272,72,48,39,1,bckgnd,bckgnd
   EndIf
 End Sub
-  
+
   'update player parameters in unit attributes
 Sub update_player
   Local i
@@ -274,7 +276,7 @@ Sub update_player
     Next
   EndIf
 End Sub
-  
+
   'write player from sprites in library
 Sub writeplayer_m(h,v,w)
   'write player on layer L
@@ -285,7 +287,7 @@ Sub writeplayer_m(h,v,w)
   pl_mv=(pl_mv+1) Mod 4
   FRAMEBUFFER write n
 End Sub
-  
+
   'uses tiles stored in library to build up screen
 Sub writeworld_m(xm,ym)
   For xn=-xm To xm
@@ -298,21 +300,21 @@ Sub writeworld_m(xm,ym)
     Next
   Next
 End Sub
-  
-  
-  
-  
+
+
+
+
   'AI oriented sub ---------------------------------------------------
   'this is the main AI loop where AI all units are processed
-  
+
   'scan through units in the unit attributes
 Sub scan_UNITS
   Local i,dx,dy,nearx,neary
   For i=1 To 47                       'unit 0 = player, skip player
     unit_type=UT(i)
-    
+
     'here we branch to different units
-    
+
     'this section handles automatic doors
     If unit_type=10 Then            'this is a door
       dx=UX(i):dy=UY(i)
@@ -332,14 +334,14 @@ Sub scan_UNITS
         close_door(i,dx,dy)
       EndIf
     EndIf
-    
+
   Next i
 End Sub
-  
+
   'door is closed, and is open at the end of this animation
 Sub open_door(i,dx,dy)
   Local u_b=UB(i)
-  if u_b=5 then Play modsample s_door,4
+  If u_b=5 Then Play modsample s_door,4
   If UA(i)=1 Then 'vertical door
     If u_b=1 Then anim_v_door(dx,dy,27,9,15):UB(i)=2
     If u_b=0 Then anim_v_door(dx,dy,70,74,78):UB(i)=1
@@ -350,11 +352,11 @@ Sub open_door(i,dx,dy)
     If u_b=5 Then anim_h_door(dx,dy,84,85,86):UB(i)=0
   EndIf
 End Sub
-  
+
   'door is open, and is closed at the end of this animation
 Sub close_door(i,dx,dy)
   Local u_b=UB(i)
-  if u_b=2 then Play modsample s_door,4
+  If u_b=2 Then Play modsample s_door,4
   If UA(i)=1 Then 'vertical door
     If u_b=4 Then anim_v_door(dx,dy,dpm(UC(i),1),72,76):UB(i)=5
     If u_b=3 Then anim_v_door(dx,dy,69,73,77):UB(i)=4
@@ -365,7 +367,7 @@ Sub close_door(i,dx,dy)
     If u_b=2 Then anim_h_door(dx,dy,88,89,86):UB(i)=3
   EndIf
 End Sub
-  
+
   'update the world map with the current vertical door tiles
 Sub anim_v_door(dx,dy,a,b,c)
   MID$(lv$(dy-1),dx+1,1)=Chr$(a)
@@ -373,7 +375,7 @@ Sub anim_v_door(dx,dy,a,b,c)
   MID$(lv$(dy+1),dx+1,1)=Chr$(c)
   writeworld_m(2,2)   'only repaint relevant section of screen
 End Sub
-  
+
   'update the world map with the current horizontal door tiles
 Sub anim_h_door(dx,dy,a,b,c)
   MID$(lv$(dy),dx,1)=Chr$(a)
@@ -381,10 +383,10 @@ Sub anim_h_door(dx,dy,a,b,c)
   MID$(lv$(dy),dx+2,1)=Chr$(c)
   writeworld_m(2,2)   'only repaint relevant section of screen
 End Sub
-  
-  
+
+
   'subs to support player handling ------------------------------------
- 
+
   'find the items in viewer area in the unit attributes
 Sub exec_viewer
   'do things
@@ -636,6 +638,31 @@ Close #1
 End Sub
 
 '@added by Martin ---------------------------------------
+Sub Ani_tiles
+'changing the Source adress for the Animated Tiles
+If ani_timer=2 Then
+ '196,197,200,201
+  tile_index(196)=tla_index(8+a3)
+  tile_index(197)=tla_index(10+a3)
+  tile_index(200)=tla_index(12+a3)
+  tile_index(201)=tla_index(14+a3)
+  Inc a3:a3=a3 And 1
+  ani_timer=0
+ EndIf
+Inc ani_timer
+  ' WATER 204
+  tile_index(204)= tla_index(20+a1)
+  'FLAG 66
+  tile_index(66) = tla_index(a1)
+  Inc a1: a1=a1 And 3
+  'TRASH COMPACTOR 148
+  tile_index(148)=tla_index(4+a2)
+  'SERVER 143
+  tile_index(143)=tla_index(19+a2)
+  Inc a2: a2=a2 And 3
+
+End Sub
+
 colors:
 '--Colorscheme accordung to Spritecolors
 Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
