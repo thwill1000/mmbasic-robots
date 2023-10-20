@@ -1,7 +1,7 @@
   'petrobot testbed picomite VGA V50708RC10
   'tbd
   '- shoot with weapons
-  
+
   ' system setup -----------------------------------------------------
   Game_Mite=0
   If Game_Mite Then
@@ -12,51 +12,51 @@
   Option default integer
   FRAMEBUFFER layer 9
   Font 9
-  
+
   'startup screen show on N
   init_map_support
   show_intro
   preload_sfx
   CLS
-  
+
   'get world map
   loadworld
   loadindex
-  
-  
-  
+
+
+
   'startup defines ---------------------------------------------------
-  
+
   'heartbeat
   Const h_beat = 120 'ms
-  
+
   'define some constants
   Const b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1   'attribute flags
   Const p_w=0,p_s1=1,p_s2=2,p_m1=3,p_m2=4   'player modes walk, search, move1+2
-  
+
   'defines
   Const hsize=128,vsize=64  'world map 128x64
   Const xm=5:ym=3           'view window on map # of tiles E-w and N-S
   Const xs=5*24:ys=4*24     'window centre with 24*24 tile reference
-  
+
   'start positions player in map in # tiles
   xp=UX(0):yp=UY(0)   'xp and yp are used parallel to UX(0) and UY(0)
-  
+
   'default text settings
   textc=RGB(green):bckgnd=0'black
-  
+
   'write frame
   Load image "images/layerb.bmp"
-  
+
   'start music/sfx modfile
   Play stop:Play modfile "Music\sfcmetallicbop2.mod"   'sfx combined with music
-  
-  
+
+
   'write initial world
   map_mode=0              'overview world map off
   writeworld_m(xm,ym)     'initialwold
   ani_timer=1             'world animations
-  
+
   'initial player attributes
   pl_sp=0        'default player is facing you
   pl_mv=0        'walking move 0..4
@@ -64,7 +64,7 @@
   pl_md=0        'player mode (0=walk/fight, 1=search, 2,3=move)
   pl_it=0        'player item
   writeplayer_m(0,0,pl_wp)
-  
+
   'init inventory
   pl_ky=0         'player has all 3 keys
   Dim pl_pa(2)=(0,0,0)  'none,pistol ammo(1),plasma ammo(2)
@@ -73,10 +73,10 @@
   pl_em=0         '#EMP
   pl_mk=0         'medkit
   pl_ma=0         '#magnets
-  
+
   UH(0)=5 'debug
-  
-  
+
+
   'main player input loop -----------------------------------------
   Do
     'player input through keyboard, clearing buffer, check loop time
@@ -87,12 +87,12 @@
     Loop Until Timer>h_beat
     Timer =0
     ky=Asc(k$)
-    
+
     'player controls movement of player character
     v=(ky=129)-(ky=128)
     h=(ky=131)-(ky=130)
     If h+v<>0 Then                    'when move key pressed
-      
+
       If pl_md=p_w Then                 'in move mode, move
         'check if we can walk, then walk
         If (get_ta(xp+h,yp+v) And b_wlk) Then
@@ -104,32 +104,32 @@
           vp=v:hp=h
         EndIf
       EndIf
-      
+
       'executing the search mode, player facing search direction
       If pl_md=p_s1 Then pl_md=p_s2:writeplayer_m(hp,vp,pl_wp)
-      
+
       'executing move mode
       If pl_md=p_m2 Then exec_move              'second stage
       If pl_md=p_m1 Then pl_md=p_m2:target_move 'first stage
-      
+
     EndIf
-    
+
     'investigate AI UNITs status and activate and process
     'scan_units
-    
+
     'update player
     update_player
-    
-    
+
+
     'change player mode
     If k$="z" Then pl_md=p_s1   'z initiates search mode
     If k$="m" Then pl_md=p_m1   'm initiates move mode
-    
+
     'player changes items or weapons
     If ky=145 Then pl_wp=(pl_wp+1) Mod 3:show_weapon:writeplayer_m(h,v,pl_wp)  'toggle weapon
     If ky=146 Then pl_it=(pl_it+1) Mod 5:show_item        'toggle ite,
     If k$=" " Then use_item                               'SPACE use item
-    
+
     'switch map mode
     If ky=9 Then 'TAB key show map + toggle player/robots
       Select Case map_mode
@@ -144,45 +144,45 @@
           writeplayer_m(hp,vp,pl_wp)
       End Select
     EndIf
-    
+
     'fire weapon
     if shot=1 then shot=0:writeplayer_m(hp,vp,pl_wp)
     If k$="w" Then shot=1:fire_ns(-1)
     If k$="a" Then shot=1:fire_ew(-1)
     If k$="s" Then shot=1:fire_ns(1)
     If k$="d" Then shot=1:fire_ew(1)
-    
+
     If k$="M" Then 'toggle music ON/OFF
       'do something
     EndIf
-    
+
     'investigate AI UNITs status and activate and process
     scan_units
-    
+
     'update the world in the viewing window
     If map_mode=0 Then
       'the viewe modes animated in the main loop
       If pl_md=p_s1 Then show_mode(&h53)  'show viewer
       If pl_md=p_s2 Then anim_viewer
       If pl_md=p_m1 Then show_mode(&h55)  'show hand
-      
+
       'the detailed world
       writeworld_m(xm,ym)       'scroll world
       ani_tiles     'change the animated Tiles
     Else
       anim_map
     EndIf
-    
+
   Loop Until ky=27   'quit when <esc> is pressed
-  
+
   MODE 1
   Memory
 End
-  
-  
-  
+
+
+
   ' screen oriented subs ------------------------------------------
-  
+
   'show player phase 1,2,3 looking_glass or hand in phase 0
 Sub show_mode(tile)
   FRAMEBUFFER write l
@@ -193,7 +193,7 @@ Sub show_mode(tile)
   x=(x+1) And 3
   FRAMEBUFFER write n
 End Sub
-  
+
   'animate map with player, or robots
 Sub anim_map
   Static t
@@ -214,14 +214,14 @@ Sub anim_map
   t=(t+1) And 3
   FRAMEBUFFER write n
 End Sub
-  
+
   'show the looking glass over the search area
 Sub anim_viewer
   FRAMEBUFFER write l
   Static p
   If p=0 Then v1=v:h1=h:v2=30*v1+ys:h2=30*h1+xs
   Inc p,1
-  
+
   'use v2 and h2 to determine the search area
   Select Case p
     Case 4,8
@@ -242,7 +242,7 @@ Sub anim_viewer
   FRAMEBUFFER write n
   If p=0 Then exec_viewer
 End Sub
-  
+
   'show hand over the tile that is to be moved
 Sub target_move
   ox=xp+h:oy=yp+v             'map coordinates of object to be moved
@@ -257,7 +257,7 @@ Sub target_move
     pl_md=pl_w  'get out of move mode
   EndIf
 End Sub
-  
+
   'show keys in frame
 Sub show_keys
   Local i
@@ -267,7 +267,7 @@ Sub show_keys
     EndIf
   Next
 End Sub
-  
+
   'show weapon in frame
 Sub show_weapon
   If pl_wp>0 Then
@@ -278,7 +278,7 @@ Sub show_weapon
     Box 272,32,48,30,1,bckgnd,bckgnd
   EndIf
 End Sub
-  
+
   'show item in frame
 Sub show_item
   If pl_it>0 Then
@@ -304,7 +304,7 @@ Sub show_item
     Box 272,72,48,39,1,bckgnd,bckgnd
   EndIf
 End Sub
-  
+
   'update player parameters in unit attributes
 Sub update_player
   Local i
@@ -322,7 +322,7 @@ Sub update_player
     Next
   EndIf
 End Sub
-  
+
   'write player ON LAYER l from sprites in library after clearing L
 Sub writeplayer_m(h,v,w)
   'static oldx,oldy,oldc
@@ -334,7 +334,7 @@ Sub writeplayer_m(h,v,w)
   pl_mv=(pl_mv+1) Mod 4                 'anime player
   FRAMEBUFFER write n
 End Sub
-  
+
   'blit only player from sprites in library, only in map_mode=0
 Sub spriteplayer(h,v,w)
   If map_mode=0 Then
@@ -344,7 +344,7 @@ Sub spriteplayer(h,v,w)
     Sprite compressed sprite_index(pl_sp+pl_mv+16*w),xs,ys,9
   EndIf
 End Sub
-  
+
   'uses tiles stored in library to build up screen
 Sub writeworld_m(xm,ym)
   For xn=-xm To xm
@@ -357,7 +357,7 @@ Sub writeworld_m(xm,ym)
     Next
   Next
 End Sub
-  
+
 Sub walk_bot_h(i,dx,dy,hov)
   '@harm: for robots use UC(i) to determine walking direction (default 0)
   '@harm: use UD(i) for speed counters
@@ -379,7 +379,7 @@ Sub walk_bot_h(i,dx,dy,hov)
     Sprite compressed sprite_index(&h31+s+(hov=0)*4),xs+24*dx,ys+24*dy,9
   EndIf
 End Sub
-  
+
 Sub walk_bot_v(i,dx,dy,hov)
   '@harm: for robots use UC(i) to determine walking direction (default 0)
   '@harm: use UD(i) for speed counters
@@ -401,18 +401,18 @@ Sub walk_bot_v(i,dx,dy,hov)
     Sprite compressed sprite_index(&h31+s+(hov=0)*4),xs+24*dx,ys+24*dy,9
   EndIf
 End Sub
-  
-  
+
+
   'AI oriented sub ---------------------------------------------------
   'this is the main AI loop where AI all units are processed
-  
+
   'scan through units in the unit attributes
   'this routine runs in layer L, only some UNITS revert to n
-  
+
 Sub scan_units
   Local i,dx,dy,nearx,neary,xy
   FRAMEBUFFER write l
-  
+
   For i=1 To 47                       'unit 0 = player, skip player
     'here we branch to different units
     dx=UX(i)-xp:dy=UY(i)-yp
@@ -461,7 +461,7 @@ Sub scan_units
   spriteplayer(hp,vp,pl_wp)
   FRAMEBUFFER write n
 End Sub
-  
+
   'door is closed, and is open at the end of this animation
 Sub open_door(i,dx,dy)
   Local u_b=UB(i)
@@ -476,7 +476,7 @@ Sub open_door(i,dx,dy)
     If u_b=5 Then anim_h_door(dx,dy,84,85,86):UB(i)=0
   EndIf
 End Sub
-  
+
   'door is open, and is closed at the end of this animation
 Sub close_door(i,dx,dy)
   Local u_b=UB(i)
@@ -491,24 +491,24 @@ Sub close_door(i,dx,dy)
     If u_b=2 Then anim_h_door(dx,dy,88,89,86):UB(i)=3
   EndIf
 End Sub
-  
+
   'update the world map with the current vertical door tiles
 Sub anim_v_door(dx,dy,a,b,c)
   MID$(lv$(dy-1),dx+1,1)=Chr$(a)
   MID$(lv$(dy),dx+1,1)=Chr$(b)
   MID$(lv$(dy+1),dx+1,1)=Chr$(c)
 End Sub
-  
+
   'update the world map with the current horizontal door tiles
 Sub anim_h_door(dx,dy,a,b,c)
   MID$(lv$(dy),dx,1)=Chr$(a)
   MID$(lv$(dy),dx+1,1)=Chr$(b)
   MID$(lv$(dy),dx+2,1)=Chr$(c)
 End Sub
-  
-  
+
+
   'subs to support player handling ------------------------------------
-  
+
   'weapon fire in horizontal direction
 Sub fire_ew(p)
   If pl_pa(pl_wp)>0 Then
@@ -527,7 +527,7 @@ Sub fire_ew(p)
         'draw fire line
         framebuffer write l
         Sprite compressed tile_index(249-4*pl_wp),xs+24*x,ys,0
-        framebuffer write n      
+        framebuffer write n
       EndIf
     Loop Until Abs(x)=xm
     if pl_wp=2 then play modsample s_plasma,4 else Play Modsample s_dspistol,4
@@ -535,7 +535,7 @@ Sub fire_ew(p)
     show_weapon
   EndIf
 End Sub
-  
+
   'weapon fire in vertical direction
 Sub fire_ns(p)
   If pl_pa(pl_wp)>0 Then
@@ -554,7 +554,7 @@ Sub fire_ns(p)
         'draw fire line
         framebuffer write l
         Sprite compressed tile_index(248-4*pl_wp),xs,ys+24*y,0
-        framebuffer write n      
+        framebuffer write n
       EndIf
     Loop Until Abs(y)=ym
     if pl_wp=2 then play modsample s_plasma,4 else Play Modsample s_dspistol,4
@@ -562,8 +562,8 @@ Sub fire_ns(p)
     show_weapon
   EndIf
 End Sub
-  
-  
+
+
   'find the items in viewer area in the unit attributes
 Sub exec_viewer
   'do things
@@ -619,12 +619,12 @@ Sub exec_viewer
   If a$="Nothing found" Then Play Modsample s_error,4:writecomment(a$)
   pl_md=p_w     'at the end, free player
 End Sub
-  
+
   'move and return to walk mode
 Sub exec_move
   Local tl$
   tx=ox+h:ty=oy+v   'determine target coordinates
-  
+
   'check if a move can be executed between object and target
   If (get_ta(tx,ty) And b_pus) Then     'you can push towards this position
     'if (is there not a unit on this tile) then
@@ -640,27 +640,27 @@ Sub exec_move
     writecomment("Object cannot move here")
     Play modsample s_error,4
   EndIf
-  
+
   'erase hand and exit move mode
   FRAMEBUFFER write l
   Box xs+(ox-xp)*24,ys+(oy-yp)*24,24,24,,col%(5),col%(5)
   FRAMEBUFFER write n
   pl_md=p_w                       'at the end, free player
 End Sub
-  
+
   'generic subs for gameplay -------------------------------------------
   'write unit position back in unit attributes (also player)
 Sub store_unit_pos(unit,x,y)
   UX(unit)=x:UY(unit)=y
 End Sub
-  
+
   'get tile attribute for this tile
 Function get_ta(x,y)
   Local til
   til=Asc(Mid$(lv$(y),x+1,1))
   get_ta = Asc(Mid$(ta$,til+1,1))
 End Function
-  
+
   'write text in the comment area at bottom screen rolling upwards
 Sub writecomment(a$)
   Local i
@@ -670,7 +670,7 @@ Sub writecomment(a$)
     Text 10,200+10*i,comment$(i),,,,textc,bckgnd
   Next i
 End Sub
-  
+
   'scale the world map to overview mode @Martin
 Sub renderLiveMap
   Local integer mx,my,mp,yy,CL(256)
@@ -688,16 +688,16 @@ Sub renderLiveMap
     Next
   Next
 End Sub
-  
+
   'pre-load sound effects @Martin
 Sub preload_sfx
   'for sfcmetallicbop.mod
   s_dsbarexp=16:s_dspistol=17:s_beep=18:s_beep2=19:s_cycle_item=20:s_cycle_weapon=21
   s_door=22:s_emp=23:S_error=24:s_found_item=25:s_magnet2=26:s_medkit=27:s_move=28
   s_plasma=29:s_shock=30:s_dsbarexp=31
-  
+
 End Sub
-  
+
   'this animates the fans, flags, water and the servers in the world map
 Sub ani_tiles '@added by Martin
   'changing the Source adress for the Animated Tiles
@@ -712,16 +712,16 @@ Sub ani_tiles '@added by Martin
     Inc a2:a2=a2 And 3
     ani_timer=0
   EndIf
-  
+
   'these animations change every main loop
   tile_index(66) = tla_index(a1)    'FLAG 66
   tile_index(148)=tla_index(4+a1)   'TRASH COMPACTOR 148
   tile_index(143)=tla_index(16+a1)  'SERVER 143
   Inc a1: a1=a1 And 3
-  
+
   Inc ani_timer
 End Sub
-  
+
 Sub use_item
   Local a
   Select Case pl_it
@@ -734,12 +734,12 @@ Sub use_item
   End Select
   show_item
 End Sub
-  
-  
+
+
   ' subs for game setup -------------------------------------------------
   'loads the world map and tile attributes and unit attributes
 Sub loadworld
-  
+
   'unit attributes in integer arrays for speed
   Dim UT(63)       'unit type
   Dim UX(63)       'unit x coordinate
@@ -749,15 +749,15 @@ Sub loadworld
   Dim UC(63)       'unit c parameter
   Dim UD(63)       'unit D parameter
   Dim UH(63)       'unit health
-  
+
   Dim LV$(63) Length 128  'the map 128h x 64v with tile numbers
   Dim DP$                 '255(+1) destruct paths
   Dim TA$                 '255(+1) tile attributes
-  
+
   'load world map and attributes
   Open "data\level-"+Chr$(97+Map_Nr) For input As #1
   'Open "data\level-a" For input As #1
-  
+
   'load unit attributes in arrays
   For i=0 To 63: UT(i)=Asc(Input$(1,#1)):Next
   For i=0 To 63: UX(i)=Asc(Input$(1,#1)):Next
@@ -767,14 +767,14 @@ Sub loadworld
   For i=0 To 63: UC(i)=Asc(Input$(1,#1)):Next
   For i=0 To 63: UD(i)=Asc(Input$(1,#1)):Next
   For i=0 To 63: UH(i)=Asc(Input$(1,#1)):Next
-  
-  
+
+
   'load world map
   dummy$=Input$(128,#1)  'hier zit geen zinvolle data in. Vreemd!
   dummy$=Input$(128,#1)
   For i=0 To 63:LV$(i)=Input$(128,#1):Next i
   Close #1
-  
+
   'load destruct paths and tile attributes
   Open "data\tileset.amiga" For input As #1
   dummy$=Input$(2,#1) 'offset
@@ -783,30 +783,30 @@ Sub loadworld
   TA$=Input$(255,#1)  '255 tile attributes
   '  dummy$=Input$(1,#1) '1 attribute ignored
   Close #1
-  
+
   'door post markings
   '0=unlocked, 1=spades, 2=heart, 3=star
   'h/v=closed     h0 h1 h2 h3  v0 v1 v2 v3
   Dim dpm(3,1) = (82,92,93,94, 68,71,75,79)
-  
+
   'item names
   Dim hidden$(6) length 6 = ("key","bomb","emp","pistol","plasma","medkit","magnet")
   Dim keyz$(3) length 5 = (" ","SPADE","HEART","STAR")
-  
+
   'empty comment string
   Dim comment$(3) length 30
   For i=0 To 3:comment$(i)=Space$(30):Next
-  
+
 End Sub
-  
+
   'read color values and MAP_NAME$
 Sub init_map_support
   'read color values and MAP_NAME$
   Dim Col%(15):Restore colors:For f=1 To 15:Read Col%(f):Next f
   Dim map_nam$(13) length 16 :Restore map_names:For f=0 To 13:Read map_nam$(f):Next f
 End Sub
-  
-  
+
+
   'load tile and sprite indexes for locations in the library
 Sub loadindex
   'get start addresses
@@ -818,7 +818,7 @@ Sub loadindex
   Local itemx=Peek(cfunaddr ITEM)
   Local tlx=Peek(cfunaddr TLA)
   Local keys=Peek(cfunaddr KEY)
-  
+
   'build global index file
   Dim sprite_index(&h60)
   Dim health_index(5)
@@ -826,66 +826,66 @@ Sub loadindex
   Dim item_index(5)
   Dim tla_index(&h17)
   Dim key_index(2)
-  
+
   Open "sprites/hlt_index.txt" For input As #1
   For i=0 To 5
     Input #1,a$
     health_index(i)=hlt+Val(a$)
   Next
   Close #1
-  
+
   Open "sprites/spr_index.txt" For input As #1
   For i=0 To &h5f
     Input #1,a$
     sprite_index(i)=spr+Val(a$)
   Next
   Close #1
-  
+
   Open "tiles/tile0_index.txt" For input As #1
   For i=0 To &h3f
     Input #1,a$
     tile_index(i)=til0+Val(a$)
   Next i
   Close #1
-  
+
   Open "tiles/tile1_index.txt" For input As #1
   For i=&h40 To &h7f
     Input #1,a$
     tile_index(i)=til1+Val(a$)
   Next
   Close #1
-  
+
   Open "tiles/tile2_index.txt" For input As #1
   For i=&h80 To &hff
     Input #1,a$
     tile_index(i)=til2+Val(a$)
   Next
   Close #1
-  
+
   Open "tiles/tla_index.txt" For input As #1
   For i=0 To &h17
     Input #1,a$
     tla_index(i)=tlx+Val(a$)
   Next
   Close #1
-  
+
   Open "sprites/key_index.txt" For input As #1
   For i=0 To 2
     Input #1,a$
     key_index(i)=keys+Val(a$)
   Next
   Close #1
-  
+
   Open "sprites/item_index.txt" For input As #1
   For i=0 To 5
     Input #1,a$
     item_index(i)=itemx+Val(a$)
   Next
   Close #1
-  
+
 End Sub
-  
-  
+
+
   'startup Menu-------------------------------------@Martin
 Sub show_intro
   'load screen
@@ -897,14 +897,14 @@ Sub show_intro
   Message$(1)="...use UP & DOWN, Space or 'A' to select"
   Message$(2)="   ...use LEFT & RIGHT to select Map    "
   Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
-  
+
   Map_Nr=0:MS=1:Difficulty=1
   ' get space for the 4th Menu entry
   Sprite 28,18,28,10,88,24:Box 32,21,80,34,,0,0
   ' start playing the intro Music
   Play Modfile "music\metal_heads.mod"
   show_menu 1
-  
+
   'Display Map Name
   Text 12,70,UCase$(map_nam$(Map_Nr))
   'sl=1 'set menu slot to top
@@ -917,14 +917,14 @@ Sub show_intro
   MSG$=MSG$+"Keep in mind that a string cannot be longer than 255 chracters ;-) "
   flip=0
   MT=0
-  
+
   'check player choice
   kill_kb
   Do
     tp$=Mid$(MSG$,1+MT,41)
     If flip Then Inc MT:If mt>Len(MSG$) Then MT=0
     cs$ = "" : k$=Inkey$: cs$=contr_input$()
-    
+
     If k$<>"" And cs$="" Then
       If k$=Chr$(129) Or Instr(cs$,"DOWN") Then Inc MS,(MS<4)
       If k$=Chr$(128) Or Instr(cs$,"UP")   Then Inc MS,-(MS>1)
@@ -956,19 +956,19 @@ Sub show_intro
         End Select
       EndIf
     EndIf
-    
+
     show_menu MS
     Text 0-(4*Flip),0,tp$,,,,Col%(2):Flip=Not(FLIP)
     Pause 50: 'Contr_input$() is to fast to see what position you are in
   Loop
   Play stop
 End Sub
-  
+
   'remove duplicate keys and key repeat
 Sub kill_kb
   Do :Loop Until Inkey$="": ' empty keyboard buffer (just in case)
 End Sub
-  
+
   'start menu selection list
 Sub show_menu(n1)
   Local FC=col%(14),BG=0,f2=col%(3),b2=col%(9)
@@ -982,7 +982,7 @@ Sub show_menu(n1)
   Text 32,46,"CONTROLS  "
   Colour FC,BG
 End Sub
-  
+
 Sub fade_in
   Local n,x,y
   For n=0 To 7
@@ -991,7 +991,7 @@ Sub fade_in
     Pause 80
   Next
 End Sub
-  
+
 Sub fade_out
   Local n,x,y
   For n=0 To 7
@@ -1000,9 +1000,9 @@ Sub fade_out
     Pause 80
   Next
 End Sub
-  
-  
-  
+
+
+
   '---joystick/Gamepad specific settings
   '   Settings for Game*Mite
 Sub init_game_ctrl
@@ -1012,7 +1012,7 @@ Sub init_game_ctrl
     SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
   Next
 End Sub
-  
+
 Function contr_input$()
   If Not gamemite Then Contr_input$="":Exit Function
   Local  n,ix% = Port(GP8, 8) Xor &h7FFF,cs$="",bit
@@ -1023,8 +1023,8 @@ Function contr_input$()
   Next
   Contr_input$=cs$
 End Function
-  
-  
+
+
 colors:
   '--Colorscheme accordung to Spritecolors
   Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
@@ -1037,12 +1037,12 @@ map_names:
   Data "05-downtown","06-pi university","07-more islands","08-robot hotel"
   Data "09-forest moon","10-death tower","11-river death","12-bunker"
   Data "13-castle robot","14-rocket center"
-  
+
   ' C64_PetsciiRobotsFont  Martin Herhaus
   ' Font type    : Full (96 Characters)
   ' Font size    : 8x8 pixels
   ' Memory usage : 768
-  
+
 DefineFont #9
   60200808
   00000000 00000000 38383838 00380038 8844EEEE 00000000 62FF6200 0062FF62
