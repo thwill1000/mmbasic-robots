@@ -115,7 +115,7 @@
     EndIf
     
     'investigate AI UNITs status and activate and process
-    scan_units
+    'scan_units
     
     'update player
     update_player
@@ -146,14 +146,18 @@
     EndIf
     
     'fire weapon
-    If k$="w" Then fire_ns(-1)
-    If k$="a" Then fire_ew(-1)
-    If k$="s" Then fire_ns(1)
-    If k$="d" Then fire_ew(1)
+    if shot=1 then shot=0:writeplayer_m(hp,vp,pl_wp)
+    If k$="w" Then shot=1:fire_ns(-1)
+    If k$="a" Then shot=1:fire_ew(-1)
+    If k$="s" Then shot=1:fire_ns(1)
+    If k$="d" Then shot=1:fire_ew(1)
     
     If k$="M" Then 'toggle music ON/OFF
       'do something
     EndIf
+    
+    'investigate AI UNITs status and activate and process
+    scan_units
     
     'update the world in the viewing window
     If map_mode=0 Then
@@ -509,24 +513,24 @@ End Sub
 Sub fire_ew(p)
   If pl_pa(pl_wp)>0 Then
     Local x=0
-    'debug
-    'if p=1 then writecomment("shoot right") else writecomment("shoot left") endif
-    'debug
     Do
       Inc x,p
       If (get_ta(xp+x,yp) And b_dmg) Then 'this tile gets the damage
-        'writecomment("target hit "+str$(x)) 'debug
         'store gunshot in UNIT attributes target object @ (xp+x,yp)
         Exit
         'else if 0 then 'see if there is a unit
         'check_units
         'store gunshot in UNIT attributes target UNIT i @ (xp+x,yp)
       ElseIf (get_ta(xp+x,yp) And (b_wlk+b_hov+b_see))=0 Then
-        'writecomment("no damage "+str$(x)) 'debug
         Exit 'stopped by wall
+      else
+        'draw fire line
+        framebuffer write l
+        Sprite compressed tile_index(249-4*pl_wp),xs+24*x,ys,0
+        framebuffer write n      
       EndIf
     Loop Until Abs(x)=xm
-    Play Modsample s_dspistol,4
+    if pl_wp=2 then play modsample s_plasma,4 else Play Modsample s_dspistol,4
     Inc pl_pa(pl_wp),-1
     show_weapon
   EndIf
@@ -536,24 +540,24 @@ End Sub
 Sub fire_ns(p)
   If pl_pa(pl_wp)>0 Then
     Local y=0
-    'debug
-    'if p=1 then writecomment("shoot down") else writecomment("shoot up") endif
-    'debug
     Do
       Inc y,p
       If (get_ta(xp,yp+y) And b_dmg) Then 'this tile gets the damage
-        'writecomment("target hit "+str$(y)) 'debug
         'store gunshot in UNIT attributes target object @ (xp,yp+y)
         Exit
         'else if 0 then 'see if there is a unit
         'check_units
         'store gunshot in UNIT attributes target UNIT i @ (xp,yp+y)
       ElseIf (get_ta(xp,yp+y) And (b_wlk+b_hov+b_see))=0 Then
-        'writecomment("no damage "+str$(y)) 'debug
         Exit 'stopped by wall
+      else
+        'draw fire line
+        framebuffer write l
+        Sprite compressed tile_index(248-4*pl_wp),xs,ys+24*y,0
+        framebuffer write n      
       EndIf
     Loop Until Abs(y)=ym
-    Play Modsample s_dspistol,4
+    if pl_wp=2 then play modsample s_plasma,4 else Play Modsample s_dspistol,4
     Inc pl_pa(pl_wp),-1
     show_weapon
   EndIf
