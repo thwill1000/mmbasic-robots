@@ -4,7 +4,7 @@
   'uncomment the limit test to get speed back
   
   ' system setup -----------------------------------------------------
-  Game_Mite=0
+  const Game_Mite=0
   If Game_Mite Then
     init_game_ctrl ' Init Controller on Game*Mite
   Else
@@ -32,7 +32,7 @@
   Const h_beat = 120 'ms
   
   'define some constants
-  Const b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1   'attribute flags
+  Const b_hid=64,b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1  'attrib flags
   Const p_w=0,p_s1=1,p_s2=2,p_m1=3,p_m2=4   'player modes walk, search, move1+2
   
   'defines
@@ -41,7 +41,7 @@
   Const xs=5*24:ys=4*24     'window centre with 24*24 tile reference
   
   'start positions player in map in # tiles
-  xp=UX(0):yp=UY(0)   'xp and yp are used parallel to UX(0) and UY(0)
+  xp=UX(0):yp=UY(0)         'xp and yp are used parallel to UX(0) and UY(0)
   
   'default text settings
   textc=RGB(green):bckgnd=0'black
@@ -69,7 +69,7 @@
   'init inventory
   pl_ky=0         'player has all 3 keys
   Dim pl_pa(2)=(0,0,0)  'none,pistol ammo(1),plasma ammo(2)
-  pl_ps=0         'plasma ammo
+  '  pl_ps=0         'plasma ammo
   pl_bo=0         '#bombs
   pl_em=0         '#EMP
   pl_mk=0         'medkit
@@ -87,6 +87,7 @@
       If tmp$<>"" Then k$=tmp$  'keep last valid key
     Loop Until Timer>h_beat
     Timer =0
+    If Game_Mite And k$="" Then k$=c2k$()
     ky=Asc(k$)
     
     
@@ -117,16 +118,16 @@
     'player controls movement of player character
     v=(ky=129)-(ky=128)
     h=(ky=131)-(ky=130)
-    If h+v<>0 Then                    'when move key pressed
+    If h+v<>0 Then                      'any cursor key pressed
       
       If pl_md=p_w Then                 'in move mode, move
         'check if we can walk, then walk
         If (get_ta(xp+h,yp+v) And b_wlk) Then
-          xp=xp+h:yp=yp+v             'new player position
-          xp=Min(Max(xp,5),hsize-6)   'don't fall off the map
+          xp=xp+h:yp=yp+v               'new player position
+          xp=Min(Max(xp,5),hsize-6)     'don't fall off the map
           yp=Min(Max(yp,3),vsize-4)
-          store_unit_pos(0,xp,yp)     'store pos for future use
-          writeplayer(h,v,pl_wp)    'update player tile
+          store_unit_pos(0,xp,yp)       'store pos for future use
+          writeplayer(h,v,pl_wp)        'update player tile
           vp=v:hp=h
         EndIf
       EndIf
@@ -135,13 +136,13 @@
       If pl_md=p_s1 Then pl_md=p_s2
       
       'executing move mode
-      If pl_md=p_m2 Then exec_move              'second stage
+      If pl_md=p_m2 Then exec_move       'second stage
       If pl_md=p_m1 Then pl_md=p_m2:target_move 'first stage
       
     EndIf
     
-    'update player
-    update_player 'needs an update
+    'align xp,yp,UX(0) and UY(0), show UH(0)
+    update_player
     
     
     'change player mode
@@ -149,32 +150,50 @@
     If k$="m" Then pl_md=p_m1   'm initiates move mode
     
     'player changes items or weapons
-    If ky=145 Then pl_wp=(pl_wp+1) Mod 3:show_weapon:writeplayer(hp,vp,pl_wp)  'toggle weapon
-    If ky=146 Then pl_it=(pl_it+1) Mod 5:show_item    'toggle item,
-    If k$=" " Then use_item                           'SPACE use item
-    
-    'switch map mode
-    If ky=9 Then 'TAB key show map + toggle player/robots
-      Select Case map_mode
-        Case 0
-          map_mode=1      'stop showing normal mode
-          renderLiveMap   'show map mode
-        Case 1
-          map_mode=2
-        Case 2
-          map_mode=0
-          FRAMEBUFFER write l:CLS  col%(5):FRAMEBUFFER write n 'clear layer
-          writeplayer(hp,vp,pl_wp)
-      End Select
-    EndIf
+    select case ky
+      case 145 'F1 toggle weapon
+        pl_wp=(pl_wp+1) Mod 3
+        show_weapon
+        writeplayer(hp,vp,pl_wp)
+        Play modsample s_cycle_weapon,4
+      case 146 'F2 toggle item
+        pl_it=(pl_it+1) Mod 5
+        show_item
+        Play modsample s_cycle_item,4
+      case 147 'F3 cheat key
+        UH(0)=12                      'full life
+        pl_ky=7:show_keys             'all keys
+        pl_pa(1)=100:pl_pa(2)=100     'much ammo
+        pl_bo=100:pl_em=100:pl_ma=100 'all items
+        pl_mk=100                     'full medkit
+      case 148 'F4 test key
+        'nothing yet
+        Play modsample 16,4
+      case 149 'F5 test key
+        'nothing yet
+        Play modsample 31,4
+      case 9 'TAB key show map + toggle player/robots
+        Select Case map_mode
+          Case 0
+            map_mode=1      'stop showing normal mode
+            renderLiveMap   'show map mode
+          Case 1
+            map_mode=2
+          Case 2
+            map_mode=0
+            FRAMEBUFFER write l:CLS  col%(5):FRAMEBUFFER write n 'clear layer
+            writeplayer(hp,vp,pl_wp)
+        End Select
+    end select
     
     'fire weapon
-    if shot=1 then shot=0':writeplayer(hp,vp,pl_wp)
-    If k$="w" Then shot=1:fire_ns(-1)
-    If k$="a" Then shot=1:fire_ew(-1)
-    If k$="s" Then shot=1:fire_ns(1)
-    If k$="d" Then shot=1:fire_ew(1)
+    if shot=1 then shot=0
+    If k$="w" Then shot=1:fire_ns(-1):writeplayer(0,-1,pl_wp)
+    If k$="a" Then shot=1:fire_ew(-1):writeplayer(-1,0,pl_wp)
+    If k$="s" Then shot=1:fire_ns(1):writeplayer(0,1,pl_wp)
+    If k$="d" Then shot=1:fire_ew(1):writeplayer(1,0,pl_wp)
     
+    If k$=" " Then use_item                           'SPACE use item
     If k$="M" Then 'toggle music ON/OFF
       'do something
     EndIf
@@ -203,11 +222,23 @@ sub writesprites
       select case UT(i)
         case 1  'player
           Sprite compressed sprite_index(UA(i)),xs,ys,9
-        case 2,3,17,18
-          Sprite compressed sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+        case 2,3
+          if UH(i)>0 then
+            Sprite compressed sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+          else
+            Sprite compressed sprite_index(&h49),xs+24*dx,ys+24*dy,9  'dead bot
+            inc UH(i),-1  'create a 1-2 seconds delay for the dead body to vanish
+            if UH(i)<-30 then UT(i)=0
+          end if
         case 9
-          'temp
-          Sprite compressed sprite_index(&h39),xs+24*dx,ys+24*dy,9
+          'temp choice for sprite
+          if UH(i)>0 then
+            Sprite compressed sprite_index(&h39),xs+24*dx,ys+24*dy,9
+          else
+            Sprite compressed sprite_index(&h4B),xs+24*dx,ys+24*dy,9  'dead bot
+            inc UH(i),-1  'create a 1-2 seconds delay for the dead body to vanish
+            if UH(i)<-30 then UT(i)=0
+          end if
         case 11
           Sprite compressed tile_index(UA(i)),xs+24*dx,ys+24*dy,0
         case 12 'shoot up
@@ -230,8 +261,16 @@ sub writesprites
           for j=1 to UC(i)
             Sprite compressed tile_index(UA(i)),xs+24*j,ys,0
           next
+        case 17,18
+          if UH(i)>0 then
+            Sprite compressed sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+          else
+            Sprite compressed sprite_index(&h4A),xs+24*dx,ys+24*dy,9  'dead bot
+            inc UH(i),-1  'create a 1-2 seconds delay for the dead body to vanish
+            if UH(i)<-30 then UT(i)=0
+          end if
         case 70' a special case where UX and UY are absolute coordinates
-          if pl_md<>p_m2 then UT(i)=0         'free slot after use
+          if pl_md<>p_m2 then UT(i)=0             'free slot after use
           Sprite compressed sprite_index(UA(i)),UB(i),UC(i),9
       end select
     end if
@@ -240,12 +279,13 @@ sub writesprites
 end sub
   
   'this adds a special UNIT sprite at absolute screen coordinates in UNIT array
+  'this allows to put sprites off-grid
 sub sprite_item(sprt,xabs,yabs)
   '@harm: the UNIT TYPE = decimal 70, UB=x and UC=y are absolute, UA=sprite number
   local i
   i=findslot()
   If i<32 then
-    UT(i)=70                          'the spcial case
+    UT(i)=70                          'the special case
     UA(i)=sprt:UB(i)=xabs:UC(i)=yabs  'the important data
     UX(i)=xp:UY(i)=yp                 'dummy entries inside view window
   end if
@@ -413,8 +453,8 @@ Sub walk_bot_h(i,dx,dy,hov)
   UD(i)=(UD(i)+1) Mod 3
   If UD(i)=0 Then
     s=(s+1) and 3
-    xy=UX(i)+2*(UC(i))-1        'new position
-    If (get_ta(xy,UY(i)) And (b_wlk+hov)) Then
+    xy=UX(i)+2*(UC(i))-1        'new position when can walk and no player
+    If (get_ta(xy,UY(i)) And (b_wlk+hov)) and not(dy=0 and xy=xp) Then
       UX(i)=xy                  'go to new position
     Else
       UC(i)=1-UC(i)             'invert direction bit
@@ -433,14 +473,14 @@ Sub walk_bot_v(i,dx,dy,hov)
   UD(i)=(UD(i)+1) Mod 3
   If UD(i)=0 Then
     s=(s+1) and 3
-    xy=UY(i)+2*(UC(i))-1  'new position
-    If (get_ta(UX(i),xy) And (b_wlk+hov)) Then
-      UY(i)=xy            'go to new position
+    xy=UY(i)+2*(UC(i))-1      'new position when can walk and no player
+    If (get_ta(UX(i),xy) And (b_wlk+hov)) and not(dx=0 and xy=yp) Then
+      UY(i)=xy                'go to new position
     Else
-      UC(i)=1-UC(i)       'invert direction bit
+      UC(i)=1-UC(i)           'invert direction bit
     EndIf
   EndIf
-  UA(i)=&h31+s+(hov=0)*4  'notify new sprite for drawing
+  UA(i)=&h31+s+(hov=0)*4      'notify new sprite for drawing
 End Sub
   
   
@@ -461,9 +501,9 @@ Sub scan_units
     Select Case UT(i)
       case 1
       Case 2 'hoverbot_h
-        walk_bot_h(i,dx,dy,b_hov)
+        if UH(i)>0 then walk_bot_h(i,dx,dy,b_hov)
       Case 3 'hoverbot_v
-        walk_bot_v(i,dx,dy,b_hov)
+        if UH(i)>0 then walk_bot_v(i,dx,dy,b_hov)
       Case 4 'hoverbot attack
       Case 5 'hoverbot_chase
       Case 7 'transporter
@@ -491,9 +531,9 @@ Sub scan_units
       Case 15 'pistol fire right
       Case 16 'trash compactor
       Case 17 'rollerbot_v
-        walk_bot_v(i,dx,dy,0)
+        if UH(i)>0 then walk_bot_v(i,dx,dy,0)
       Case 18 'rollerbot_h
-        walk_bot_h(i,dx,dy,0)
+        if UH(i)>0 then walk_bot_h(i,dx,dy,0)
     End Select
     'EndIf
   Next i
@@ -560,48 +600,63 @@ function findslot()
   findslot=i
 end function
   
+  'create a small explosion at location
+sub small_explosion(i)
+  local j
+  j=findslot()
+  if j<32 then
+    UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
+    Play modsample 16,4's_dsbarexp,4
+  end if
+end sub
   
   'weapon fire in horizontal direction
 Sub fire_ew(p)
-  '@harm: UD() is the tile of the target (or 0)
-  '@harm: UC() is length of the fire line
-  '@harm: UB() is the UNIT hit
-  '@harm: UA() is the fire line sprite
+  'UD() is the tile of the target (or 0)
+  'UC() is length of the fire line
+  'UB() is the UNIT hit
+  'UA() is the fire line sprite
   If pl_pa(pl_wp)>0 Then
     
-    Local x=0,i,j,b=0,d=0
+    Local x=0,i,j,b=0,d=0,TA
+    
     i=findslot()      'find a weapon slot in UNIT array
     if i<32 then
-      UT(i)=127:UX(i)=xp:UY(i)=yp 'default
       
+      UT(i)=127:UX(i)=xp:UY(i)=yp 'default claim array slot
       Do
-        Inc x,p
-        If (get_ta(xp+x,yp) And b_dmg) Then   'this tile gets the damage
-          UX(i)=xp+x                          'location of damage
-          UD(i)=Asc(Mid$(lv$(yp),xp+x+1,1))   'tile damaged
-          select case UD(i)
-            case &h83 'canister
-              j=findslot()
-              if j<32 then UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
-              mid$(lv$(yp),xp+x+1,1)=chr$(&h87)
-            case &hCD 'bridge wood
-              j=findslot()
-              if j<32 then UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
-              mid$(lv$(yp),xp+x+1,1)=chr$(&hCC)
-          end select
-          inc x,-p:Exit 'register shot
-          'else if 0 then 'see if there is a unit
-          'check_units
-          'store gunshot in UNIT attributes target UNIT i @ (xp+x,yp)
-        ElseIf (get_ta(xp+x,yp) And (b_wlk+b_hov+b_see))=0 Then
-          inc x,-p:Exit  'stopped by wall
-        EndIf
+        Inc x,p:TA=get_ta(xp+x,yp):UX(i)=xp+x 'next tile n/s
+        
+        j=has_unit(UX(i),UY(i))
+        if j then' if robot then damage it
+          small_explosion(i)
+          inc UH(j),(-1-10*(pl_wp=2))
+          'text 0,0,str$(UH(j)) 'debug
+          inc x,-p:Exit do
+          
+        else If (TA And (b_wlk+b_hov)) Then   'pass fire, next tile
+          
+        else If (TA And b_dmg) Then           'this tile gets the damage
+          small_explosion(i)
+          'show_ta(xp+x,yp)
+          d=Asc(Mid$(lv$(yp),xp+x+1,1))         'tile damaged, change
+          if d=&h83 then mid$(lv$(yp),xp+x+1,1)=chr$(&h87)  'canister
+          inc x,-p:Exit do
+          
+        elseIf (TA And (b_see))=0 Then  'stopped by wall or plant
+          small_explosion(i)
+          inc x,-p:Exit do
+          
+        end if
+        
       Loop Until Abs(x)=xm
       
       'register for screen
       if abs(x)>=1 then
         UT(i)=14+(x>0):UC(i)=x:UA(i)=249-4*pl_wp
         UB(i)=b:UD(i)=d
+      else
+        UT(i)=0 'free slot
       end if
     end if
     
@@ -617,46 +672,54 @@ End Sub
   
   'weapon fire in vertical direction
 Sub fire_ns(p)
-  '@harm: UD() is the tile of the target (or 0)
-  '@harm: UC() is length of the fire line
-  '@harm: UB() is the UNIT hit
-  '@harm: UA() is the sprite
+  'UD() is the tile of the target (or 0)
+  'UC() is length of the fire line
+  'UB() is the UNIT (robot) hit
+  'UA() is the sprite
   If pl_pa(pl_wp)>0 Then
     
-    Local y=0,i,j,b=0,d=0
-    i=findslot()      'find a weapon slot in UNITarray
+    Local y=0,i,b=0,d=0,TA
+    
+    i=findslot()      'find a weapon slot in UNIT array
     if i<32 then
-      UT(i)=127:UX(i)=xp:UY(i)=yp 'default
       
+      UT(i)=127:UX(i)=xp:UY(i)=yp   'default claim array slot
       Do
-        Inc y,p
-        If (get_ta(xp,yp+y) And b_dmg) Then 'this tile gets the damage
-          UY(i)=yp+y                          'location of the damage
-          UD(i)=Asc(Mid$(lv$(yp+y),xp+1,1))   'tile damaged
-          select case UD(i)
-            case &h83 'canister
-              j=findslot()
-              if j<32 then UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
-              mid$(lv$(yp+y),xp+1,1)=chr$(&h87)
-            case &hCD 'bridge wood
-              j=findslot()
-              if j<32 then UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
-              mid$(lv$(yp+y),xp+1,1)=chr$(&hCC)
-          end select
-          inc y,-p:Exit'register fireline
-          'else if 0 then 'see if there is a unit
-          'check_units
-          'store gunshot in UNIT attributes target UNIT i @ (xp,yp+y)
-        ElseIf (get_ta(xp,yp+y) And (b_wlk+b_hov+b_see))=0 Then
-          inc y,-p:Exit 'stopped by wall
-        EndIf
+        
+        Inc y,p:TA=get_ta(xp,yp+y):UY(i)=yp+y 'next tile n/s
+        
+        j=has_unit(UX(i),UY(i))
+        if j then 'if robot then damage it
+          small_explosion(i)
+          inc UH(j),(-1-10*(pl_wp=2))
+          'text 0,0,str$(UH(j)) 'debug
+          inc x,-p:Exit do
+          
+        else If (TA And (b_wlk+b_hov)) Then   'pass fire, next tile
+          
+        else If (TA And b_dmg) Then            'this tile gets the damage
+          'show_ta(xp,yp+y)
+          small_explosion(i)
+          d=Asc(Mid$(lv$(yp+y),xp+1,1))         'tile damaged, change
+          if d=&h83 then mid$(lv$(yp+y),xp+1,1)=chr$(&h87)   'canister
+          inc y,-p:Exit do
+          
+        elseIf (TA And (b_see))=0 Then  'stopped by wall or plant
+          small_explosion(i)
+          inc y,-p:Exit do
+          
+        end if
+        
       Loop Until Abs(y)=ym
       
       'register for screen
       if abs(y)>=1 then
         UT(i)=12+(y>0):UC(i)=y:UA(i)=248-4*pl_wp
         UB(i)=b:UD(i)=d
+      else
+        UT(i)=0 'free slot
       end if
+      
     end if
     
     'play sound
@@ -668,6 +731,16 @@ Sub fire_ns(p)
     
   EndIf
 End Sub
+  
+  'is there a robot on this location in the map
+function has_unit(x,y)
+  local i=1
+  has_unit=0
+  do
+    if UX(i)=x and UY(i)=y and UT(i)>0 then has_unit=i
+    inc i,1
+  loop until i=28
+end function
   
   
   'find the items in viewer area in the unit attributes
@@ -759,6 +832,11 @@ End Sub
 Sub store_unit_pos(unit,x,y)
   UX(unit)=x:UY(unit)=y
 End Sub
+  
+sub show_ta(x,y)
+  text 0,0,right$("0000000"+bin$(get_ta(x,y)),8)
+end sub
+  
   
   'get tile attribute for this tile
 Function get_ta(x,y)
@@ -1002,7 +1080,8 @@ Sub show_intro
   Local Message$(4) length 40
   Message$(1)="...use UP & DOWN, Space or 'A' to select"
   Message$(2)="   ...use LEFT & RIGHT to select Map    "
-  Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
+  Message$(3)=" ...use LEFT & RIGHT change Difficulty  "
+  Local DIFF_LEVEL_WORD$(2)=("easy  ","normal","hard  ")
   
   Map_Nr=0:MS=1:Difficulty=1
   ' get space for the 4th Menu entry
@@ -1029,11 +1108,11 @@ Sub show_intro
   Do
     tp$=Mid$(MSG$,1+MT,41)
     If flip Then Inc MT:If mt>Len(MSG$) Then MT=0
-    cs$ = "" : k$=Inkey$: cs$=contr_input$()
-    
-    If k$<>"" And cs$="" Then
-      If k$=Chr$(129) Or Instr(cs$,"DOWN") Then Inc MS,(MS<4)
-      If k$=Chr$(128) Or Instr(cs$,"UP")   Then Inc MS,-(MS>1)
+    k$=Inkey$
+    If Game_Mite And k$="" Then k$=c2k$()
+    If k$<>"" Then
+      If k$=Chr$(129) Then Inc MS,(MS<4)
+      If k$=Chr$(128) Then Inc MS,-(MS>1)
       If k$=" " Or Instr(cs$,"BUT-A") Then
         Select Case MS
           Case 1
@@ -1057,6 +1136,25 @@ Sub show_intro
           Case 3
             'select DIFFICULTY
             Text 0,224,message$(3),,,,Col%(3)
+            Do
+              k$=Inkey$
+              If  k$<>"" Then
+                If k$=" " Then
+                  Text 0,224,message$(1),,,,Col%(3)
+                  Text 0,232,"      "
+                  Exit
+                EndIf
+                If k$=Chr$(130) Then
+                  Inc Diff_Level,-(Diff_Level>0)
+                EndIf
+                If k$=Chr$(131) Then
+                  Inc Diff_Level,(Diff_Level<2)
+                EndIf
+                Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
+                Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
+              EndIf
+            Loop
+            
           Case 4
             'select CONTROLS
         End Select
@@ -1128,6 +1226,22 @@ Function contr_input$()
     bit=2^n:If ix% And bit Then Inc cs$,m$(n)+" "
   Next
   Contr_input$=cs$
+End Function
+  
+  'Controller to Keyboard translation
+Function c2k$()
+  Local c$,tmp$
+  c$=contr_input$()
+  If c$<>"" Then
+    If c$="DOWN " Then c2k$=Chr$(129)
+    If c$="UP " Then c2k$=Chr$(128)
+    If c$="LEFT " Then c2k$=Chr$(130)
+    If c$="RIGHT " Then c2k$=Chr$(131)
+    If c$="BUT-A " Then c2k$="m"
+    If c$="BUT-B " Then c2k$="z"
+    If c$="START " Then c2k$=" "
+    If c$="BUT-B BUT-A ")Then c2k$=Chr$(9)
+  EndIf
 End Function
   
   
