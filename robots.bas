@@ -1,16 +1,14 @@
   'petrobot testbed picomite VGA V50708RC17 or later
   
-  
-  'system setup -----------------------------------------------------
+  ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  const nesPG1=0
+  Const nesPG1=1
   
-  'alternate controllers
   If Game_Mite Then
     sc$="f":init_game_ctrl ' Init Controller on Game*Mite
   Else
-    sc$="n":mode 2
+    sc$="n":MODE 2
   EndIf
   If nesPG1 Then
     config_nes
@@ -76,7 +74,7 @@
   map_mode=0              'overview world map off
   writeworld_n(xm,ym)     'initialwold
   ani_timer=1             'world animations
-
+  
   'game play variables
   spn=0                   'sprite number
   em_on=0                 '1=is emp active
@@ -983,6 +981,8 @@ Sub do_damage(x,y,r,d)
           MID$(lv$(y+j),i+x+1,1)=Chr$(&h2E) 'small box
         Case &hCD
           MID$(lv$(y+j),i+x+1,1)=Chr$(&hCC) 'bridge
+        case &h18
+          MID$(lv$(y+j),i+x+1,1)=Chr$(9) 'plant
       End Select
     Next
   Next
@@ -1631,7 +1631,7 @@ Sub show_intro
   show_menu 1
   
   'Display Map Name
-  Text 12,70,UCase$(map_nam$(Map_Nr))
+  Text 9,70,UCase$(map_nam$(Map_Nr))
   'sl=1 'set menu slot to top
   '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
@@ -1648,6 +1648,7 @@ Sub show_intro
   Do
     If flip=0 Then Inc MT:If mt>Len(MSG$) Then MT=0
     tp$=Mid$(MSG$,1+MT,41)
+    'If flip Then Inc MT:If mt>Len(MSG$) Then MT=0
     k$=Inkey$:If k$="" Then k$=c2k$()
     If k$<>"" Then
       If k$=Chr$(129) Then Inc MS,(MS<4)
@@ -1662,7 +1663,7 @@ Sub show_intro
             kill_kb
             Text 0,224,message$(2),,,,col(3)
             Do
-              k$=Inkey$:If Game_Mite and k$="" Then k$=c2k$()
+              k$=Inkey$:If k$="" Then k$=c2k$()
               If  k$<>""  Then
                 If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
                 If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
@@ -1670,9 +1671,9 @@ Sub show_intro
                   Text 0,224,message$(1),,,,col(3): Exit
                 EndIf
                 Text 9,70,UCase$(map_nam$(Map_Nr))
-                if Game_Mite then framebuffer merge 9,b
+                If Game_Mite Then FRAMEBUFFER merge 9,b
               EndIf
-              pause 200
+              Pause 200
             Loop
             kill_kb
           Case 3
@@ -1680,11 +1681,12 @@ Sub show_intro
             kill_kb
             Text 0,224,message$(3),,,,col(3)
             Do
-              k$=Inkey$
+              k$=Inkey$:If k$="" Then k$=c2k$()
               If  k$<>"" Then
                 If k$=" " Then
                   Text 0,224,message$(1),,,,col(3)
                   Text 0,232,"      "
+                  
                   Exit
                 EndIf
                 If k$=Chr$(130) Then
@@ -1697,7 +1699,7 @@ Sub show_intro
                 Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
                 If Game_Mite Then FRAMEBUFFER Merge 9,b
               EndIf
-              pause 200
+              Pause 200
             Loop
             kill_kb
           Case 4
@@ -1708,8 +1710,8 @@ Sub show_intro
     
     show_menu MS,col(puls(t))
     
-    '    if not Game_Mite then framebuffer wait
     Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) and 3
+    'Text 0-(4*Flip),0,tp$,,,,col(2):Flip=Not(FLIP)
     Inc t: t=t Mod 12
     If Game_Mite Then FRAMEBUFFER Merge 9,b
     Pause 50: 'Contr_input$() is to fast to see what position you are in
@@ -1722,7 +1724,6 @@ End Sub
 Sub kill_kb
   Local k$
   Do
-    'k$=Inkey$
     k$=Inkey$:If k$="" Then k$=c2k$()
   Loop Until k$=""
 End Sub
@@ -1769,10 +1770,10 @@ End Sub
   
   'settings for NES on PicoGameVGA platform port A
 sub config_nes
-  Const a_dat=2   'GP1
-  Const a_latch=4 'GP2
-  Const a_clk=5   'GP3
-  Const pulse_len!=0.012 '12uS
+  DIM a_dat=2   'GP1
+  DIM a_latch=4 'GP2
+  DIM a_clk=5   'GP3
+  DIM pulse_len!=0.012 '12uS
   SetPin a_dat, din
   SetPin a_latch, dout
   SetPin a_clk, dout
