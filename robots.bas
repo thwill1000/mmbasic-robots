@@ -421,7 +421,7 @@ Sub game_end
   Text 180,82,hhh$+":"+mmm$+":"+sss$
   Text 180,98,Str$(left_bots)+" / "+Str$(start_bots)
   Text 180,114,Str$(left_hidden)+" / "+Str$(start_hidden)
-  Text 180,130,"?"
+  Text 180,130,DIFF_LEVEL_WORD$(diff_level)
   Play stop
   If left_bots Then
     Play modfile "music/lose.mod"
@@ -660,7 +660,7 @@ End Sub
   'this routine runs in layer L, only some UNITS revert to n
   
 Sub AI_units
-  Local i,dx,dy,nearx,neary,xy,j
+  Local i,dx,dy,nearx,neary,xy,j,k
   
   For i=0 To 27 'units
     dx=UX(i)-xp:dy=UY(i)-yp
@@ -669,13 +669,21 @@ Sub AI_units
       Case 0,1 'player is animated through controls
       Case 2 'hoverbot_h
         If UH(i)>0 Then
-          if em_on=0 then walk_bot_h(i,dx,dy,b_hov)
+          if UC(i)>1 then
+            dazzle_bot(i)
+          else
+            if em_on=0 then walk_bot_h(i,dx,dy,0)
+          end if
         else  'sudden death" 2 seconds delay for dead body to vanish
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
         EndIf
       Case 3 'hoverbot_v
         If UH(i)>0 Then
-          if em_on=0 then walk_bot_v(i,dx,dy,b_hov)
+          if UC(i)>1 then
+            dazzle_bot(i)
+          else
+            if em_on=0 then walk_bot_v(i,dx,dy,0)
+          end if
         Else  'sudden death" 2 seconds delay for dead body to vanish
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
         EndIf
@@ -687,7 +695,11 @@ Sub AI_units
               if UH(0)>0 then zap(0) 'show damage to player
               UH(0)=max(UH(0)-1,0)  'damage player
             else
-              if em_on=0 then agro_bot(i,dx,dy,b_hov) 'bot move closer
+              if UC(i)>1 then
+                dazzle_bot(i)
+              else
+                if em_on=0 then agro_bot(i,dx,dy,b_hov) 'bot move closer
+              end if
             end if
           end if
         Else  'create a 1-2 seconds delay for the dead robot to vanish
@@ -703,7 +715,11 @@ Sub AI_units
               if UH(0)>0 then zap(0) 'show damage to player
               UH(0)=max(UH(0)-6,0)  'damage player
             else
-              if em_on=0 then agro_bot(i,dx,dy,0) 'bot move closer
+              if UC(i)>1 then
+                dazzle_bot(i)
+              else
+                if em_on=0 then agro_bot(i,dx,dy,0) 'bot move closer
+              end if
             end if
           end if
         Else  'create a 1-2 seconds delay for the dead robot to vanish
@@ -711,7 +727,11 @@ Sub AI_units
         EndIf
       Case 17 'rollerbot_v
         If UH(i)>0 Then
-          if em_on=0 then walk_bot_v(i,dx,dy,0)
+          if UC(i)>1 then
+            dazzle_bot(i)
+          else
+            if em_on=0 then walk_bot_v(i,dx,dy,0)
+          end if
           UB(i)=Max(UB(i)-1,0)
           If UB(i)=0 And UH(0)>0 Then
             If dy=0 Then bot_shoot_h(i,dx)
@@ -722,7 +742,11 @@ Sub AI_units
         EndIf
       Case 18 'rollerbot_h
         If UH(i)>0 Then
-          if em_on=0 then walk_bot_h(i,dx,dy,0)
+          if UC(i)>1 then
+            dazzle_bot(i)
+          else
+            if em_on=0 then walk_bot_h(i,dx,dy,0)
+          end if
           UB(i)=Max(UB(i)-1,0)
           If UB(i)=0 And UH(0)>0 Then
             If dy=0 Then bot_shoot_h(i,dx)
@@ -733,6 +757,7 @@ Sub AI_units
         EndIf
     End Select
   Next
+  
   For i=28 To 31 'tile animations, explosions
     dx=UX(i)-xp:dy=UY(i)-yp
     nearx=Abs(dx):neary=Abs(dy)
@@ -756,11 +781,21 @@ Sub AI_units
         If UB(i)<0 Then
           UT(i)=0 'free slot
         Else
-          'confuse near by robots
-        EndIf
+          if nearx=0 and neary=0 then 'pick up magnet
+            UT(i)=0:inc pl_ma,1:show_item
+          else
+            'check for robot contact with magnet
+            j=has_unit(UX(i),UY(i))
+            if j>0 then 'mark robot
+              UT(i)=0:UC(j)=2 'magnet used, bot move direction random
+              play modsample s_magnet2,4
+            end if
+          EndIf
+        endif
       Case 73 'emp
         if UB(i)<24 then  'freeze robots 3 seconds
           em_on=1
+          play modsample s_emp,4
         else
           em_on=0:UT(i)=0 'remove from list
         end if
@@ -772,6 +807,7 @@ Sub AI_units
         If UA(i)=253 Then UT(i)=0 'done exploding
     End Select
   Next
+  
   For i=32 To 47  'door animations, raft, elevator
     dx=UX(i)-xp:dy=UY(i)-yp
     nearx=Abs(dx):neary=Abs(dy)
@@ -863,6 +899,35 @@ Sub AI_units
     End Select
   Next
 End Sub
+  
+sub dazzle_bot(i)
+  UD(i)=(UD(i)+1) and 3 'walking speed
+  if UD(i)=0 then
+    local r=int(rnd()*5),xy
+    inc UC(i),1 'time count 3,4...
+    if UC(i)<32 then '30=15 seconds, counter starts at 2
+      'new random location bot
+      select case r
+        case 0 'nothing
+        case 1
+          xy=UX(i)+1
+          If (get_ta(xy,UY(i)) And b_wlk) and Not(dy=0 And xy=xp) Then inc UX(i),1
+        case 2
+          xy=UX(i)-1
+          If (get_ta(xy,UY(i)) And b_wlk) and Not(dy=0 And xy=xp) Then inc UX(i),-1
+        case 3
+          xy=UY(i)+1
+          If (get_ta(UX(i),xy) And b_wlk) and Not(xy=yp And dx=0) Then inc UY(i),1
+        case 4
+          xy=UY(i)-1
+          If (get_ta(UX(i),xy) And b_wlk) and Not(xy=yp And dx=0) Then inc UY(i),-1
+      end select
+    else 'end of dazzle
+      UC(i)=0 'notmal walking direction
+    end if
+  end if
+end sub
+  
   
 Sub bot_shoot_h(i,dx)
   'UB()=counter, only shoot 1x per second
@@ -1013,7 +1078,7 @@ Sub place_magnet
   Local i=findslot()
   If i<32 Then
     UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=120
-    Inc pl_bo,-1:show_item
+    Inc pl_ma,-1:show_item
     writecomment("you placed a magnet")
   EndIf
 End Sub
@@ -1623,7 +1688,7 @@ Sub show_intro
   Message$(1)="...use UP & DOWN, Space or 'Start'      "
   Message$(2)="   ...use LEFT & RIGHT to select Map    "
   Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
-  Local DIFF_LEVEL_WORD$(2)=("easy  ","normal","hard  ")
+  dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
   Map_Nr=0:MS=1:Difficulty=1
   
   ' start playing the intro Music
