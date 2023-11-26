@@ -3,7 +3,7 @@
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Const nesPG1=1
+  Const nesPG1=0
   
   If Game_Mite Then
     sc$="f":init_game_ctrl ' Init Controller on Game*Mite
@@ -67,8 +67,8 @@
   
   'start music/sfx modfile
   music=1
-  Play stop:Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
-  
+  '  Play stop:Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
+  select_music(map_nr mod 3)
   
   'write initial world
   map_mode=0              'overview world map off
@@ -205,20 +205,14 @@
         k$=""
         Play stop:music=1-music
         If music Then
-          Play modfile "music/petsciisfx.mod"
+          select_music(3) 'only sfx
         Else
-          Play modfile "music/sfcmetallicbop2.mod"
+          select_music(map_nr mod 3) 'any of 3 songs
         EndIf
       EndIf
       
       'investigate AI UNITs status and activate and process
       AI_units
-      
-      'debug weapon slots
-      'print @(0,0)"";:for ii=28 to 31:print UT(ii);" ";:next ii
-      
-      'debug show position
-      'print @(0,0)"0x";hex$(xp);" 0x";hex$(yp);"  ";
       
       'update the world in the viewing window
       If map_mode=0 Then
@@ -250,7 +244,17 @@
       EndIf
       
     EndIf 'pl_md<p_death
+    
+    if ky=27 then
+      writecomment("PAUSE, press <ESC> to quit")
+      do
+        k$=inkey$:if k$="" then k$=c2k$()
+      loop while k$=""
+      if k$<>chr$(27) then writecomment("continue"):ky=28 'any value that does not quit
+    end if
+    
     If Game_Mite Then FRAMEBUFFER merge 9,b
+    
   Loop Until ky=27   'quit when <esc> is pressed
   
   game_end
@@ -294,8 +298,8 @@ Sub writesprites_l
           Else
             Sprite memory sprite_index(&h49),xs+24*dx,ys+24*dy,9  'dead bot
           EndIf
-          'case 4 'bot chasing temp sprite
-          'Sprite memory sprite_index(&h31),xs+24*dx,ys+24*dy,9
+        case 5 'bot drowning
+          Sprite memory tile_index(UA(i)),xs+24*dx,ys+24*dy,0
         Case 9
           If UH(i)>0 Then
             Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
@@ -429,6 +433,21 @@ Sub game_end
     Play modfile "music/win.mod"
   EndIf
 End Sub
+  
+sub select_music(a)
+  Play stop
+  select case a
+    case 1
+      Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
+    case 2
+      Play modfile "music/rushin_in-sfx-c.mod"   'sfx combined with music
+    case 0
+      Play modfile "music/get psyched.mod"       'sfx combined with music ?
+    case 3
+      Play modfile "music/petsciisfx.mod"        'only sfx
+  end select
+end sub
+  
   
   'animate map with player, or robots
 Sub anim_map
@@ -625,7 +644,7 @@ Sub walk_bot_h(i,dx,dy,hov)
   UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbor runs faster
   If UD(i)=0 Then
     xy=UX(i)+2*(UC(i))-1        'new position when can walk and no player
-    If (get_ta(xy,UY(i)) And (b_wlk+hov)) And Not(dy=0 And xy=xp) Then
+    If (get_ta(xy,UY(i)) And (b_wlk+hov))>0 And Not(dy=0 And xy=xp) Then
       UX(i)=xy                  'go to new position
     Else
       UC(i)=1-UC(i)             'invert direction bit
@@ -643,7 +662,7 @@ Sub walk_bot_v(i,dx,dy,hov)
   UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbot is faster
   If UD(i)=0 Then
     xy=UY(i)+2*(UC(i))-1      'new position when can walk and no player
-    If (get_ta(UX(i),xy) And (b_wlk+hov)) And Not(dx=0 And xy=yp) Then
+    If (get_ta(UX(i),xy) And (b_wlk+hov))>0 And Not(dx=0 And xy=yp) Then
       UY(i)=xy                'go to new position
     Else
       UC(i)=1-UC(i)           'invert direction bit
@@ -670,9 +689,9 @@ Sub AI_units
       Case 2 'hoverbot_h
         If UH(i)>0 Then
           if UC(i)>1 then
-            dazzle_bot(i)
+            if em_on=0 then dazzle_bot(i)
           else
-            if em_on=0 then walk_bot_h(i,dx,dy,0)
+            if em_on=0 then walk_bot_h(i,dx,dy,b_hov)
           end if
         else  'sudden death" 2 seconds delay for dead body to vanish
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
@@ -680,9 +699,9 @@ Sub AI_units
       Case 3 'hoverbot_v
         If UH(i)>0 Then
           if UC(i)>1 then
-            dazzle_bot(i)
+            if em_on=0 then dazzle_bot(i)
           else
-            if em_on=0 then walk_bot_v(i,dx,dy,0)
+            if em_on=0 then walk_bot_v(i,dx,dy,b_hov)
           end if
         Else  'sudden death" 2 seconds delay for dead body to vanish
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
@@ -696,7 +715,7 @@ Sub AI_units
               UH(0)=max(UH(0)-1,0)  'damage player
             else
               if UC(i)>1 then
-                dazzle_bot(i)
+                if em_on=0 then dazzle_bot(i)
               else
                 if em_on=0 then agro_bot(i,dx,dy,b_hov) 'bot move closer
               end if
@@ -705,8 +724,12 @@ Sub AI_units
         Else  'create a 1-2 seconds delay for the dead robot to vanish
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
         EndIf
-      Case 5 'hoverbot_chase
-        if UH(i)<=0 then UT(i)=0
+      Case 5 'hoverbot_drowning
+        UD(i)=(UD(i)+1) Mod 2 'adapt for agression level
+        if UD(i)=0 then
+          UA(i)=UA(i)+1
+          if UA(i)>&h8e then UT(i)=0
+        end if
       Case 9 'evilbot chase player
         If UH(i)>0 Then
           UD(i)=(UD(i)+1) Mod 2 'adapt for agression level
@@ -716,7 +739,7 @@ Sub AI_units
               UH(0)=max(UH(0)-6,0)  'damage player
             else
               if UC(i)>1 then
-                dazzle_bot(i)
+                if em_on=0 then dazzle_bot(i)
               else
                 if em_on=0 then agro_bot(i,dx,dy,0) 'bot move closer
               end if
@@ -728,7 +751,7 @@ Sub AI_units
       Case 17 'rollerbot_v
         If UH(i)>0 Then
           if UC(i)>1 then
-            dazzle_bot(i)
+            if em_on=0 then dazzle_bot(i)
           else
             if em_on=0 then walk_bot_v(i,dx,dy,0)
           end if
@@ -743,7 +766,7 @@ Sub AI_units
       Case 18 'rollerbot_h
         If UH(i)>0 Then
           if UC(i)>1 then
-            dazzle_bot(i)
+            if em_on=0 then dazzle_bot(i)
           else
             if em_on=0 then walk_bot_h(i,dx,dy,0)
           end if
@@ -794,15 +817,24 @@ Sub AI_units
         endif
       Case 73 'emp
         if UB(i)<24 then  'freeze robots 3 seconds
+          if em_on=0 then 'only once
+            for j=1 to 27 'hoverbots within EMP range
+              if UT(j)<5 and abs(UX(j)-xp)<5 and abs(UY(j)-yp)<5 then 
+                'if water then drawn
+                if ASC(MID$(lv$(UY(j)),UX(j)+1,1))=&hCC then UT(j)=5:UA(j)=&h8C
+              end if
+            next
+          end if
           em_on=1
-          play modsample s_emp,4
         else
           em_on=0:UT(i)=0 'remove from list
         end if
         inc UB(i),1
       Case 74 'canister blow
-        do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
-        Play modsample s_dsbarexp,4
+        if UA(i)=247 then 'only once...
+          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
+          Play modsample s_dsbarexp,4
+        end if
         Inc UA(i),1  'next tile in explosion sequence
         If UA(i)=253 Then UT(i)=0 'done exploding
     End Select
@@ -911,16 +943,16 @@ sub dazzle_bot(i)
         case 0 'nothing
         case 1
           xy=UX(i)+1
-          If (get_ta(xy,UY(i)) And b_wlk) and Not(dy=0 And xy=xp) Then inc UX(i),1
+          If (get_ta(xy,UY(i)) And b_wlk)>0 and Not(dy=0 And xy=xp) Then inc UX(i),1
         case 2
           xy=UX(i)-1
-          If (get_ta(xy,UY(i)) And b_wlk) and Not(dy=0 And xy=xp) Then inc UX(i),-1
+          If (get_ta(xy,UY(i)) And b_wlk)>0 and Not(dy=0 And xy=xp) Then inc UX(i),-1
         case 3
           xy=UY(i)+1
-          If (get_ta(UX(i),xy) And b_wlk) and Not(xy=yp And dx=0) Then inc UY(i),1
+          If (get_ta(UX(i),xy) And b_wlk)>0 and Not(xy=yp And dx=0) Then inc UY(i),1
         case 4
           xy=UY(i)-1
-          If (get_ta(UX(i),xy) And b_wlk) and Not(xy=yp And dx=0) Then inc UY(i),-1
+          If (get_ta(UX(i),xy) And b_wlk)>0 and Not(xy=yp And dx=0) Then inc UY(i),-1
       end select
     else 'end of dazzle
       UC(i)=0 'notmal walking direction
@@ -1201,6 +1233,16 @@ sub zap(i)
   EndIf
 end sub
   
+sub explosion(i)
+  if pl_wp=2 then 'plasma explosion 11 dmg radius 2
+    Local j=findslot()
+    If j<32 Then UT(j)=74:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247:UB(j)=24:UC(j)=3:UD(j)=11
+  else
+    small_explosion(i) 'pistol explosion
+  end if
+end sub
+  
+  
   'weapon fire in horizontal direction
 Sub fire_ew(p)
   'UD() is the start of the fire line
@@ -1220,8 +1262,8 @@ Sub fire_ew(p)
         
         j=has_unit(UX(i),UY(i))
         If j Then' if robot then damage it
-          small_explosion(i)
-          Inc UH(j),(-1-10*(pl_wp=2))
+          explosion(i)
+          if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
           
@@ -1232,7 +1274,7 @@ Sub fire_ew(p)
           Inc x,-p:Exit
           
         ElseIf (t And (b_see))=0 Then  'stopped by wall or plant
-          small_explosion(i)
+          explosion(i)
           Inc x,-p:Exit
           
         EndIf
@@ -1266,7 +1308,7 @@ Sub fire_ns(p)
   'UA() is the sprite
   If pl_pa(pl_wp)>0 Then
     
-    Local y=0,i,b=0,d=0,t
+    Local y=0,i,j,b=0,d=0,t
     
     i=findslot()      'find a weapon slot in UNIT array
     If i<32 Then
@@ -1278,8 +1320,8 @@ Sub fire_ns(p)
         
         j=has_unit(UX(i),UY(i))
         If j Then 'if robot then damage it
-          small_explosion(i)
-          Inc UH(j),(-1-10*(pl_wp=2))
+          explosion(i)
+          if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
           
@@ -1290,7 +1332,7 @@ Sub fire_ns(p)
           Inc y,-p:Exit
           
         ElseIf (t And (b_see))=0 Then  'stopped by wall or plant
-          small_explosion(i)
+          explosion(i)
           Inc y,-p:Exit
           
         EndIf
@@ -1538,6 +1580,7 @@ Sub use_item
           UT(a)=73:UX(a)=xp:UY(a)=yp:UB(a)=0  'start emp
           pl_em=max(pl_em-1,0)                'lower inventory
           writecomment("you placed an EMP")
+          writecomment("ROBOTS near you will reboot")
           play modsample s_emp,4  'emp sound
         end if
       end if
