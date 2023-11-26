@@ -68,8 +68,7 @@
   
   'write frame around playfield
   FRAMEBUFFER Write sc$
-  Load image "images/layerb.bmp"  'the actual frame
-  sprite write #1,0,0 'top of screen showing robot eyes
+  Load image "images/layer_b.bmp"  'the actual frame
   If Game_Mite Then FRAMEBUFFER Merge 9
   
   'start music/sfx modfile
@@ -599,7 +598,6 @@ Sub blow_canister(x,y)
   Local i=findslot()
   If i<32 Then
     UT(i)=74:UX(i)=x:UY(i)=y:UA(i)=247:UC(i)=2:UD(i)=11
-    '    writecomment("you blew a canister")
   EndIf
 End Sub
   
@@ -625,6 +623,7 @@ sub crush(i,x,y)
     if UB(i)=2 then anim_tc(x,y,&h98,&h99,&h9C,&h9D):UB(i)=3
     if UB(i)=1 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=2
   end if
+  if UB(i)=0 and UH(0)=0 then game_over
 end sub
   
   
@@ -673,7 +672,6 @@ End Sub
   
   'door is open, and is closed at the end of this animation
 Sub close_door(i,dx,dy)
-  '  if Asc(Mid$(lv$(dy),dx+1,1))<>9 then UB(i)=5 'skip close when blocked
   Local u_b=UB(i)
   If u_b=2 Then Play modsample s_door,4
   If UA(i)=1 Then 'vertical door
@@ -925,7 +923,7 @@ Sub AI_units
         If nearx<2 And neary<2 and UD(i)=0 Then   'operate door
           If UC(i)=0 Then
             open_door(i,UX(i),UY(i))
-          ElseIf (UC(i) And pl_ky) Then
+          ElseIf (2^(UC(i)-1) And pl_ky) Then 'bugfix untested
             open_door(i,UX(i),UY(i))
           Else
             If once<>UC(i) Then
@@ -987,7 +985,7 @@ Sub AI_units
             INC UX(i),-1:IF UX(i)=UB(i) then UA(i)=1:UD(i)=16
           end if
           MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(&hF2) 'new is raft tile
-          if dx=0 and dy=0 then xp=UX(i) 'if we where on the raft, stay on it
+          if dx=0 and dy=0 then xp=UX(i) 'if we are on the raft, stay on it
         end if
         inc UD(i),-1 'timer
     End Select
@@ -1323,7 +1321,7 @@ End Sub
   
   'update player sprites to be used on layer L, depending weapon and direction
 Sub writeplayer(h,v,w)
-  '@harm: use UA(i) as sprite number
+  'UA(i) as sprite number
   pl_sp=8*(v=-1)+4*(h=1)+12*(h=-1)        'sprite matching orientation
   IF UA(0)<48 THEN UA(0)=pl_sp+pl_mv+16*w 'store in UNIT log
   pl_mv=(pl_mv+1) Mod 4                   'anime player
@@ -1518,7 +1516,6 @@ Sub exec_move
       MID$(lv$(ty),tx+1,1)=Mid$(lv$(oy),ox+1,1)
       If Asc(tl$)=148 Then tl$=Chr$(9)  'if trash compactor then floor
       MID$(lv$(oy),ox+1,1)=tl$
-      'play sound
       Play modsample s_move,4
     end if
   Else
@@ -1552,10 +1549,8 @@ Sub use_item
       end if
     Case 3 'magnet
       pl_md=p_mg1
-      'writecomment("3")
     Case 4 'bomb
       pl_md=p_bo1
-      'writecomment("4")
   End Select
   show_item
 End Sub
@@ -1696,7 +1691,6 @@ Sub loadworld
   
   'load world map and attributes
   pause 100: Open "data\level-"+Chr$(97+Map_Nr) For input As #1
-  'Open "data\level-a" For input As #1
   
   'load unit attributes in arrays
   For i=0 To 63: UT(i)=Asc(Input$(1,#1)):Next
@@ -1710,7 +1704,7 @@ Sub loadworld
   
   
   'load world map
-  dummy$=Input$(128,#1)  'hier zit geen zinvolle data in. Vreemd!
+  dummy$=Input$(128,#1)  '256 empty bytes
   dummy$=Input$(128,#1)
   For i=0 To 63:LV$(i)=Input$(128,#1):Next
   Close #1
@@ -1721,7 +1715,6 @@ Sub loadworld
   DP$=Input$(255,#1)  '255 destruct paths
   dummy$=Input$(1,#1) '1 path ignored
   TA$=Input$(255,#1)  '255 tile attributes
-  '  dummy$=Input$(1,#1) '1 attribute ignored
   Close #1
   
   'door post markings
@@ -1742,7 +1735,7 @@ End Sub
   
   'assign sound effects names
 Sub preload_sfx
-  'for sfcmetallicbop.mod
+  'for all combined MOD files by Martin.H
   s_dsbarexp=16:s_dspistol=17:s_beep=18:s_beep2=19:s_cycle_item=20:s_cycle_weapon=21
   s_door=22:s_emp=23:S_error=24:s_found_item=25:s_magnet2=26:s_medkit=27:s_move=28
   s_plasma=29:s_shock=30
@@ -1762,8 +1755,7 @@ Sub loadgraphics
   local fl_adr=mm.info(flash address 3) 'load flash start adress
   
   'copy the sprites into a picomite flash slot #4
-  'flash slot #4 has the exact same start address as the old library
-  'so the same index applies
+  'flash slot #3 has the exact same start address as the library
   flash disk load 3,"lib/pet_lib23.bin",o
   
   'load global index file
@@ -1825,7 +1817,7 @@ Sub show_intro
   Map_Nr=0:MS=1:Difficulty=1
   
   ' start playing the intro Music
-  Play Modfile "music\metal_heads.mod"
+  Play Modfile "music\metal_heads-sfx.mod"
   show_menu 1
   
   'Display Map Name
@@ -1909,14 +1901,11 @@ Sub show_intro
     show_menu MS,col(puls(t))
     
     Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) and 3
-    'Text 0-(4*Flip),0,tp$,,,,col(2):Flip=Not(FLIP)
     Inc t: t=t Mod 12
     If Game_Mite Then FRAMEBUFFER Merge 9,b
-    Pause 50: 'Contr_input$() is to fast to see what position you are in
+    Pause 50
   Loop
   Play stop
-  'save image "images\strip.bmp",0,85,320,16
-  sprite read #1,0,85,320,16
 End Sub
   
   
