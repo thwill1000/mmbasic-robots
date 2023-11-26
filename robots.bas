@@ -173,10 +173,6 @@
             pl_bo=100:pl_em=100:pl_ma=100 'all items
             pl_mk=100                     'full medkit
           end if
-        Case 148 'F4 cheat kill all bots
-          for i=1 to 27:UH(i)=0:next 'kill all robots
-        case 149 'F5 cheat lure robot 1 into trash compactor
-          UX(1)=&h51:UY(1)=&h27:UH(1)=11:UT(1)=4
         Case 9 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
@@ -247,10 +243,11 @@
     
     if ky=27 then
       writecomment("PAUSE, press <ESC> to quit")
+      kill_kb
       do
-        k$=inkey$:if k$="" then k$=c2k$()
+        pause 100:k$=inkey$:if k$="" then k$=c2k$()
       loop while k$=""
-      if k$<>chr$(27) then writecomment("continue"):ky=28 'any value that does not quit
+      if k$<>chr$(27) then ky=28:writecomment("continue") 'any value that does not quit
     end if
     
     If Game_Mite Then FRAMEBUFFER merge 9,b
@@ -725,7 +722,7 @@ Sub AI_units
           Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
         EndIf
       Case 5 'hoverbot_drowning
-        UD(i)=(UD(i)+1) Mod 2 'adapt for agression level
+        UD(i)=(UD(i)+1) Mod 6 'adapt for drowning speed
         if UD(i)=0 then
           UA(i)=UA(i)+1
           if UA(i)>&h8e then UT(i)=0
