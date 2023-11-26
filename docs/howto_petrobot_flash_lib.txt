@@ -1,0 +1,66 @@
+Create compressed library file from sprites
+
+in each of below folders
+/sprites/health
+/sprites/keys
+/sprites/items
+/sprites/spr-files
+/tiles/tile0_3f
+/tiles/tile40_7f
+/tiles/tile80_bf
+/tiles/tilec0_ff
+/tiles/tla
+RUN "spr2csub2.bas"
+
+This generates index files and compressed library files
+Now we use the PicoMite library to combine the CSUB's int
+
+if needed LIBRARY DELETE
+in /tiles
+LOAD "tile0_csub.bas"
+LIBRARY SAVE
+LOAD "tile1_csub.bas"
+LIBRARY SAVE
+LOAD "tile2_csub.bas"
+LIBRARY SAVE
+LOAD "tile3_csub.bas"
+LIBRARY SAVE
+LOAD "tla_csub.bas"
+LIBRARY SAVE
+
+in /sprites
+LOAD "hlt_csub.bas"
+LIBRARY SAVE
+LOAD "key_csub.bas"
+LIBRARY SAVE
+LOAD "item_csub.bas"
+LIBRARY SAVE
+LOAD "spr_csub.bas"
+LIBRARY SAVE
+
+Now we save the created library to disk
+LIBRARY DISK SAVE "lib/pet_lib23.bin"
+
+Now we create a index file for the newly created binary file
+in
+/tools
+RUN "make_index.bas"
+
+This generates a relative master index file /lib/flash_index.txt
+
+We do not need the library anymore, so delete it.
+LIBRARY DELETE
+
+Result: all sprites and tiles compressed to 
+/lib/pet_lib23.bin
+And the relative pointers to the tiles are in
+/lib/flash_index.txt
+
+This biary can be loaded in a flash slot (i.e. slot 3) 
+FLASH DISK LOAD 3,"lib/pet_lib23.bin",o
+
+And the relative index can be made absolute by adding an offset equal to MM.INFO(flash address 3).
+
+Now we have absolute pointers to memory addresses that contain valid compressed sprite info (size info + binary bitmap)
+
+
