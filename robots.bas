@@ -1,5 +1,6 @@
   'petrobot testbed picomite VGA V50708RC17 or later
   
+  
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
@@ -19,9 +20,14 @@
   FRAMEBUFFER layer 9 'color 9 is transparant
   Font 9
   
-  'startup screen show on N
+  
+  
+  'game configuration screen show on N ------------------------
   init_map_support
   show_intro
+  
+  
+  'start of the actual game -----------------------------------
   preload_sfx
   CLS
   
@@ -30,13 +36,13 @@
   statistics(start_bots,start_hidden) 'to calculate end screen
   loadgraphics
   
-  'adapt for difficulty level
+  'adapt hoverbots for difficulty level
   if Diff_level=2 then
     for i=1 to 27: UT(i)=4*(UT(i)<4):next 'aggro all hoverbots
   end if
   
   
-  'startup defines ---------------------------------------------------
+  'startup defines --------------------------------------------
   
   'heartbeat
   Dim h_beat=120 'ms
@@ -60,10 +66,10 @@
   'default text settings
   textc=RGB(green):bckgnd=0'black
   
-  'write frame
+  'write frame around playfield
   FRAMEBUFFER Write sc$
-  Load image "images/layerb.bmp"
-  load image "images/strip.bmp"
+  Load image "images/layerb.bmp"  'the actual frame
+  sprite write #1,0,0 'top of screen showing robot eyes
   If Game_Mite Then FRAMEBUFFER Merge 9
   
   'start music/sfx modfile
@@ -98,6 +104,9 @@
   pl_em=0         '#EMP
   pl_mk=0         'medkit
   pl_ma=0         '#magnets
+  
+  
+  
   
   
   'main player input loop -----------------------------------------
@@ -262,16 +271,24 @@
   
   pause 5000:play stop:run
   
-  '  if not Game_Mite then mode 1
-  '  Memory
-  
 End
   
   
   
   ' screen oriented subs ------------------------------------------
   
-  'write UNITS's for 0..31 to screen, this is only the graphical output
+  'uses tiles stored in library to build up playfield in layer N
+Sub writeworld_n(xm,ym)
+  For xn=-xm To xm
+    For yn=-ym To ym
+      'load tile from world map
+      spn=Peek(byte(lva+(yp+yn)*129)+xp+xn+1)
+      Blit memory tile_index(spn),xs+xn*24,ys+yn*24
+    Next
+  Next
+End Sub
+  
+  'write UNITS's to screen on layer L, no AI, only graphics
 Sub writesprites_l
   Local i,j,dx,dy
   FRAMEBUFFER write l
@@ -374,10 +391,11 @@ Sub writesprites_l
   FRAMEBUFFER write sc$
 End Sub
   
+  
   'this adds a special UNIT sprite at absolute screen coordinates in UNIT array
   'this allows to put sprites off-grid
 Sub sprite_item(sprt,xabs,yabs)
-  '@harm: the UNIT TYPE = decimal 70, UB=x and UC=y are absolute, UA=sprite number
+  'UT=decimal 70, UB=x and UC=y are absolute, UA=sprite number
   Local i
   i=findslot()
   If i<32 Then
@@ -386,6 +404,7 @@ Sub sprite_item(sprt,xabs,yabs)
     UX(i)=xp:UY(i)=yp                 'dummy entries inside view window
   EndIf
 End Sub
+  
   
 Sub show_explosion(t,x,y,r) 'show explosion inside view window
   Local i,j,rr
@@ -403,14 +422,15 @@ Sub show_explosion(t,x,y,r) 'show explosion inside view window
   Next
 End Sub
   
+  
   'show player phase 2,3 looking_glass or hand in phase 0,1
 Sub show_mode(tile)
   Static x
-  'sprite_item(tile,xs,ys)             'over player
   If x<2 Then sprite_item(tile,xs,ys)  'over player
   'x=2,3 do nothing
   x=(x+1) And 3
 End Sub
+  
   
   'game over popup
 Sub game_over
@@ -420,6 +440,7 @@ Sub game_over
   pl_md=p_death
   framebuffer write sc$:writecomment("press <ESC>"):framebuffer write l
 End Sub
+  
   
   'game end screen and statitics
 Sub game_end
@@ -443,83 +464,6 @@ Sub game_end
   EndIf
 End Sub
   
-sub select_music(a)
-  Play stop
-  select case a
-    case 0,1
-      Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
-    case 2
-      Play modfile "music/rushin_in-sfx-c.mod"   'sfx combined with music
-      '    case 0
-      '      Play modfile "music/get psyched.mod"       'sfx combined with music ?
-    case 3
-      Play modfile "music/petsciisfx.mod"        'only sfx
-  end select
-end sub
-  
-  
-  'animate map with player, or robots
-Sub anim_map
-  Static t
-  Local i
-  FRAMEBUFFER write l
-  If t=0 Then CLS col(5) 'transparent layer
-  If t=2 Then
-    select case map_mode
-      case 1
-        Box 5+2*UX(0),43+2*UY(0),4,4,1,0,RGB(red)          'show player
-      case 2
-        For i=1 To 27
-          If UT(i)>0 Then
-            Box 6+2*UX(i),44+2*UY(i),2,2,,RGB(fuchsia)  'show all 27 bots
-          EndIf
-        Next
-      case 3
-        For i=48 To 63
-          If UT(i)>127 Then
-            Box 6+2*UX(i),44+2*UY(i),2,2,,RGB(black)  'show all hidden
-          EndIf
-        Next
-    end select
-  end if
-  t=(t+1) And 3
-  FRAMEBUFFER write sc$
-End Sub
-  
-  'show the looking glass over the search area
-Sub anim_viewer
-  Static p
-  If p=0 Then v1=v:h1=h:v2=30*v1+ys:h2=30*h1+xs
-  Inc p,1
-  
-  'use v2 and h2 to determine the search area
-  Select Case p
-    Case 4,8
-      sprite_item(&h53,h2+8,v2+8)
-    Case 3,7
-      sprite_item(&h53,h2+8,v2-8)
-    Case 2,6
-      sprite_item(&h53,h2-8,v2-8)
-    Case 1,5
-      sprite_item(&h53,h2-8,v2+8)
-    Case 9
-      p=0
-  End Select
-  If p=0 Then exec_viewer
-End Sub
-  
-  'show hand over the tile that is to be moved
-Sub target_move
-  ox=xp+h:oy=yp+v             'map coordinates of object to be moved
-  hm=h:vm=v                   'global for use later
-  If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
-    sprite_item(&h55,24*h+xs,24*v+ys)
-  Else
-    writecomment("Object cannot be moved")
-    Play modsample s_error,4
-    pl_md=p_w  'get out of move mode
-  EndIf
-End Sub
   
   'show keys in frame
 Sub show_keys
@@ -531,6 +475,7 @@ Sub show_keys
   Next
 End Sub
   
+  
   'show weapon in frame
 Sub show_weapon
   If pl_wp>0 Then
@@ -541,6 +486,7 @@ Sub show_weapon
     Box 272,32,48,30,1,bckgnd,bckgnd
   EndIf
 End Sub
+  
   
   'show item in frame
 Sub show_item
@@ -568,124 +514,225 @@ Sub show_item
   EndIf
 End Sub
   
-  'update player parameters in unit attributes
-Sub update_player
+  
+  ' animations ----------------------------------------------------------
+  
+  'animate compact world map with player, robots, or hidden items
+Sub anim_map
+  Static t
   Local i
-  Static oldhealth
-  UX(0)=xp:UY(0)=yp
-  If oldhealth<>UH(0) Then
-    Sprite memory health_index(Min(Int((12-UH(0))/2),5)),272,160
-    oldhealth=UH(0)
-    For i=1 To 12
-      If i > oldhealth Then
-        Box 267+4*i,220,3,5,1,bckgnd,bckgnd
-      Else
-        Box 267+4*i,220,3,5,1,textc,textc
-      EndIf
-    Next
-    If UH(0)=0 Then
-      UA(0)=&h4C 'dead sprite
-    EndIf
+  FRAMEBUFFER write l
+  If t=0 Then CLS col(5) 'transparent layer
+  If t=2 Then
+    select case map_mode
+      case 1
+        Box 5+2*UX(0),43+2*UY(0),4,4,1,0,RGB(red)          'show player
+      case 2
+        For i=1 To 27
+          If UT(i)>0 Then
+            Box 6+2*UX(i),44+2*UY(i),2,2,,RGB(fuchsia)  'show all 27 bots
+          EndIf
+        Next
+      case 3
+        For i=48 To 63
+          If UT(i)>127 Then
+            Box 6+2*UX(i),44+2*UY(i),2,2,,RGB(black)  'show all hidden
+          EndIf
+        Next
+    end select
+  end if
+  t=(t+1) And 3
+  FRAMEBUFFER write sc$
+End Sub
+  
+  
+  'show the looking glass over the search area
+Sub anim_viewer
+  Static p
+  If p=0 Then v1=v:h1=h:v2=30*v1+ys:h2=30*h1+xs
+  Inc p,1
+  
+  'use v2 and h2 to determine the search area
+  Select Case p
+    Case 4,8
+      sprite_item(&h53,h2+8,v2+8)
+    Case 3,7
+      sprite_item(&h53,h2+8,v2-8)
+    Case 2,6
+      sprite_item(&h53,h2-8,v2-8)
+    Case 1,5
+      sprite_item(&h53,h2-8,v2+8)
+    Case 9
+      p=0
+  End Select
+  If p=0 Then exec_viewer
+End Sub
+  
+  
+  'show hand over the tile that is to be moved
+Sub target_move
+  ox=xp+h:oy=yp+v             'map coordinates of object to be moved
+  hm=h:vm=v                   'global for use later
+  If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
+    sprite_item(&h55,24*h+xs,24*v+ys)
+  Else
+    writecomment("Object cannot be moved")
+    Play modsample s_error,4
+    pl_md=p_w  'get out of move mode
   EndIf
 End Sub
   
   
-  'write player ON LAYER l from sprites in library after clearing L
-Sub writeplayer(h,v,w)
-  '@harm: use UA(i) as sprite number
-  pl_sp=8*(v=-1)+4*(h=1)+12*(h=-1)        'sprite matching orientation
-  IF UA(0)<48 THEN UA(0)=pl_sp+pl_mv+16*w 'store in UNIT log
-  pl_mv=(pl_mv+1) Mod 4                   'anime player
-End Sub
-  
-  
-  'uses tiles stored in library to build up screen
-Sub writeworld_n(xm,ym)
-  For xn=-xm To xm
-    For yn=-ym To ym
-      'load tile from world map
-      spn=Peek(byte(lva+(yp+yn)*129)+xp+xn+1)
-      Blit memory tile_index(spn),xs+xn*24,ys+yn*24
-    Next
-  Next
-End Sub
-  
-  'for hoverbot and evilbot use same tracing algorithm
-Sub agro_bot(i,dx,dy,hov)
-  '@harm: use UD(i) for speed counters
-  '@harm: use UA(i) as sprite number
-  Local x=dx,y=dy,d,mv=0
-  static p
-  
-  'first try X direction
-  if dx<0 then
-    x=dx+1:d=&h3d
-  elseif dx>0 then
-    x=dx-1:d=&h45
-  end if
-  If (get_ta(xp+x,UY(i)) And (b_wlk+hov)) Then UX(i)=xp+x:mv=(x<>dx)
-  
-  'if X unseccesfull, try Y
-  if mv=0 then
-    if dy<0 then
-      y=dy+1:d=&h39
-    elseif dy>0 then
-      y=dy-1:d=&h41
-    end if
-    If (get_ta(UX(i),yp+y) And (b_wlk+hov)) Then UY(i)=yp+y
-  end if
-  
-  p=(p+1) and 3
-  if hov=0 then 'evilbot
-    UA(i)=d+p 'animated sprites for drawing
-  else 'agro hoverbot
-    UA(i)=&h31+p'notify new sprite for drawing
-  end if
-  
-End Sub
-  
-  
-Sub walk_bot_h(i,dx,dy,hov)
-  '@harm: for robots use UC(i) to determine walking direction (default 0)
-  '@harm: use UD(i) for speed counters
-  '@harm: use UA(i) as sprite number
-  Local xy
-  UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbor runs faster
-  If UD(i)=0 Then
-    xy=UX(i)+2*(UC(i))-1        'new position when can walk and no player
-    If (get_ta(xy,UY(i)) And (b_wlk+hov))>0 And Not(dy=0 And xy=xp) Then
-      UX(i)=xy                  'go to new position
-    Else
-      UC(i)=1-UC(i)             'invert direction bit
-    EndIf
+Sub place_bomb
+  'UA()=sprite,UB()=delay in loops (3 sec),UC()=radius,UD()=damage
+  Local i=findslot()
+  If i<32 Then
+    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=24:UC(i)=3:UD(i)=11
+    Inc pl_bo,-1:show_item
+    writecomment("you placed a bomb")
   EndIf
-  UA(i)=&h31+(hov=0)*4        'notify new sprite for drawing
 End Sub
   
   
-Sub walk_bot_v(i,dx,dy,hov)
-  '@harm: for robots use UC(i) to determine walking direction (default 0)
-  '@harm: use UD(i) for speed counters
-  '@harm: use UA(i) as sprite number
-  Local xy
-  UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbot is faster
-  If UD(i)=0 Then
-    xy=UY(i)+2*(UC(i))-1      'new position when can walk and no player
-    If (get_ta(UX(i),xy) And (b_wlk+hov))>0 And Not(dx=0 And xy=yp) Then
-      UY(i)=xy                'go to new position
-    Else
-      UC(i)=1-UC(i)           'invert direction bit
-    EndIf
+Sub blow_canister(x,y)
+  'UA()=tile,UC()=radius,UD()=damage
+  Local i=findslot()
+  If i<32 Then
+    UT(i)=74:UX(i)=x:UY(i)=y:UA(i)=247:UC(i)=2:UD(i)=11
+    '    writecomment("you blew a canister")
   EndIf
-  UA(i)=&h31+(hov=0)*4      'notify new sprite for drawing
 End Sub
+  
+  
+Sub place_magnet
+  'UA()=sprite,UB()=duration in loops (around 15 seconds)
+  Local i=findslot()
+  If i<32 Then
+    UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=120
+    Inc pl_ma,-1:show_item
+    writecomment("you placed a magnet")
+  EndIf
+End Sub
+  
+  
+  'animates the trash compactor
+sub crush(i,x,y)
+  static c
+  c=1-c 'slow down
+  if c then
+    if UB(i)=4 then anim_tc(x,y,&h90,&h91,&h94,&h94):UB(i)=0
+    if UB(i)=3 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=4
+    if UB(i)=2 then anim_tc(x,y,&h98,&h99,&h9C,&h9D):UB(i)=3
+    if UB(i)=1 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=2
+  end if
+end sub
+  
+  
+  'replaces 4 tiles of the trash compactor
+sub anim_tc(x,y,a,b,c,d)
+  MID$(lv$(y-1),x+1,1)=Chr$(a)
+  MID$(lv$(y-1),x+2,1)=Chr$(b)
+  MID$(lv$(y),x+1,1)=Chr$(c)
+  MID$(lv$(y),x+2,1)=Chr$(d)
+End Sub
+  
+  
+Sub open_elev(i,dx,dy)
+  Local u_b=UB(i)
+  If u_b=5 Then Play modsample s_door,4
+  If u_b=1 Then anim_h_door(dx,dy,182,9,&hAC):UB(i)=2
+  If u_b=0 Then anim_h_door(dx,dy,181,89,&hAD):UB(i)=1
+  If u_b=5 Then anim_h_door(dx,dy,84,85,&hAE):UB(i)=0
+End Sub
+  
+  
+Sub close_elev(i,dx,dy)
+  Local u_b=UB(i)
+  If u_b=2 Then Play modsample s_door,4
+  If u_b=4 Then anim_h_door(dx,dy,80,81,&hAE):UB(i)=5
+  If u_b=3 Then anim_h_door(dx,dy,84,85,&hAD):UB(i)=4
+  If u_b=2 Then anim_h_door(dx,dy,181,89,&hAC):UB(i)=3
+End Sub
+  
+  
+  'door is closed, and is open at the end of this animation
+Sub open_door(i,dx,dy)
+  Local u_b=UB(i)
+  If u_b=5 Then Play modsample s_door,4
+  If UA(i)=1 Then 'vertical door
+    If u_b=1 Then anim_v_door(dx,dy,27,9,15):UB(i)=2
+    If u_b=0 Then anim_v_door(dx,dy,70,74,78):UB(i)=1
+    If u_b=5 Then anim_v_door(dx,dy,69,73,77):UB(i)=0
+  Else 'horizontal door
+    If u_b=1 Then anim_h_door(dx,dy,17,9,91):UB(i)=2
+    If u_b=0 Then anim_h_door(dx,dy,88,89,86):UB(i)=1
+    If u_b=5 Then anim_h_door(dx,dy,84,85,86):UB(i)=0
+  EndIf
+End Sub
+  
+  
+  'door is open, and is closed at the end of this animation
+Sub close_door(i,dx,dy)
+  '  if Asc(Mid$(lv$(dy),dx+1,1))<>9 then UB(i)=5 'skip close when blocked
+  Local u_b=UB(i)
+  If u_b=2 Then Play modsample s_door,4
+  If UA(i)=1 Then 'vertical door
+    If u_b=4 Then anim_v_door(dx,dy,dpm(UC(i),1),72,76):UB(i)=5
+    If u_b=3 Then anim_v_door(dx,dy,69,73,77):UB(i)=4
+    If u_b=2 Then anim_v_door(dx,dy,70,74,78):UB(i)=3
+  Else 'horizontal door
+    If u_b=4 Then anim_h_door(dx,dy,80,81,dpm(UC(i),0)):UB(i)=5
+    If u_b=3 Then anim_h_door(dx,dy,84,85,86):UB(i)=4
+    If u_b=2 Then anim_h_door(dx,dy,88,89,86):UB(i)=3
+  EndIf
+End Sub
+  
+  
+  'update the world map with the current vertical door tiles
+Sub anim_v_door(dx,dy,a,b,c)
+  MID$(lv$(dy-1),dx+1,1)=Chr$(a)
+  MID$(lv$(dy),dx+1,1)=Chr$(b)
+  MID$(lv$(dy+1),dx+1,1)=Chr$(c)
+End Sub
+  
+  
+  'update the world map with the current horizontal door tiles
+Sub anim_h_door(dx,dy,a,b,c)
+  MID$(lv$(dy),dx,1)=Chr$(a)
+  MID$(lv$(dy),dx+1,1)=Chr$(b)
+  MID$(lv$(dy),dx+2,1)=Chr$(c)
+End Sub
+  
+  
+  'this animates the fans, flags, water and the servers in the world map
+Sub ani_tiles '@added by Martin
+  'changing the pointer for the Animated Tiles
+  Static a1,a2,a3
+  If ani_timer=2 Then   'change every second main loop
+    tile_index(196)=tla_index(8+a3)   'large fan 196
+    tile_index(197)=tla_index(10+a3)  'large fan 197
+    tile_index(200)=tla_index(12+a3)  'large fan 200
+    tile_index(201)=tla_index(14+a3)  'large fan 201
+    Inc a3:a3=a3 And 1
+    tile_index(204)=tla_index(20+a2) 'WATER 204
+    Inc a2:a2=a2 And 3
+    ani_timer=0
+  EndIf
+  
+  'these animations change every main loop
+  tile_index(66) = tla_index(a1)    'FLAG 66
+  tile_index(148)=tla_index(4+a1)   'TRASH COMPACTOR 148
+  tile_index(143)=tla_index(16+a1)  'SERVER 143
+  Inc a1: a1=a1 And 3
+  
+  Inc ani_timer
+End Sub
+  
   
   
   'AI oriented sub ---------------------------------------------------
   'this is the main AI loop where AI all units are processed
-  
-  'scan through units in the unit attributes
-  'this routine runs in layer L, only some UNITS revert to n
+  'routine runs in layer L, only some UNITS revert to n
   
 Sub AI_units
   Local i,dx,dy,nearx,neary,xy,j,k
@@ -947,6 +994,77 @@ Sub AI_units
   Next
 End Sub
   
+  
+  'for hoverbot and evilbot use same tracing algorithm
+Sub agro_bot(i,dx,dy,hov)
+  'UD(i) for speed counters
+  'UA(i) as sprite number
+  Local x=dx,y=dy,d,mv=0
+  static p
+  
+  'first try X direction
+  if dx<0 then
+    x=dx+1:d=&h3d
+  elseif dx>0 then
+    x=dx-1:d=&h45
+  end if
+  If (get_ta(xp+x,UY(i)) And (b_wlk+hov)) Then UX(i)=xp+x:mv=(x<>dx)
+  
+  'if X unseccesfull, try Y
+  if mv=0 then
+    if dy<0 then
+      y=dy+1:d=&h39
+    elseif dy>0 then
+      y=dy-1:d=&h41
+    end if
+    If (get_ta(UX(i),yp+y) And (b_wlk+hov)) Then UY(i)=yp+y
+  end if
+  
+  p=(p+1) and 3
+  if hov=0 then 'evilbot
+    UA(i)=d+p 'animated sprites for drawing
+  else 'agro hoverbot
+    UA(i)=&h31+p'notify new sprite for drawing
+  end if
+End Sub
+  
+  
+Sub walk_bot_h(i,dx,dy,hov)
+  'UC(i) = walking direction (default 0)
+  'UD(i) for speed counters
+  'UA(i) as sprite number
+  Local xy
+  UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbor runs faster
+  If UD(i)=0 Then
+    xy=UX(i)+2*(UC(i))-1        'new position when can walk and no player
+    If (get_ta(xy,UY(i)) And (b_wlk+hov))>0 And Not(dy=0 And xy=xp) Then
+      UX(i)=xy                  'go to new position
+    Else
+      UC(i)=1-UC(i)             'invert direction bit
+    EndIf
+  EndIf
+  UA(i)=&h31+(hov=0)*4        'notify new sprite for drawing
+End Sub
+  
+  
+Sub walk_bot_v(i,dx,dy,hov)
+  'UC(i) = walking direction (default 0)
+  'UD(i) for speed counters
+  'UA(i) as sprite number
+  Local xy
+  UD(i)=(UD(i)+1) Mod (2+(hov=b_hov)) 'rollerbot is faster
+  If UD(i)=0 Then
+    xy=UY(i)+2*(UC(i))-1      'new position when can walk and no player
+    If (get_ta(UX(i),xy) And (b_wlk+hov))>0 And Not(dx=0 And xy=yp) Then
+      UY(i)=xy                'go to new position
+    Else
+      UC(i)=1-UC(i)           'invert direction bit
+    EndIf
+  EndIf
+  UA(i)=&h31+(hov=0)*4      'notify new sprite for drawing
+End Sub
+  
+  
 sub dazzle_bot(i)
   UD(i)=(UD(i)+1) and 3 'walking speed
   if UD(i)=0 then
@@ -1028,6 +1146,7 @@ Sub bot_shoot_h(i,dx)
   EndIf
 End Sub
   
+  
 Sub bot_shoot_v(i,dy)
   'UB()=counter, only shoot 1x per second
   Local t,j,y,p=1-2*(dy<0)  'if dy<0 then p=-1 if dy>0 then p=+1
@@ -1073,6 +1192,7 @@ Sub bot_shoot_v(i,dy)
 End Sub
   
   
+  'applies damage to all units and objects in a radius
 Sub do_damage(x,y,r,d)
   Local i,j,a,rr
   
@@ -1084,7 +1204,7 @@ Sub do_damage(x,y,r,d)
   
   For i=48 To 63  'hidden content
     If Abs(UX(i)-x)<r then
-    if Abs(UY(i)-y)<r Then UT(i)=0 'remove hidden item
+      if Abs(UY(i)-y)<r Then UT(i)=0 'remove hidden item
     endif
   Next
   
@@ -1112,121 +1232,39 @@ Sub do_damage(x,y,r,d)
   Next
 End Sub
   
-Sub place_bomb
-  'UA()=sprite,UB()=delay in loops (around 3 seconds),UC()=radius,UD()=damage
-  Local i=findslot()
-  If i<32 Then
-    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=24:UC(i)=3:UD(i)=11
-    Inc pl_bo,-1:show_item
-    writecomment("you placed a bomb")
-  EndIf
-End Sub
   
-Sub blow_canister(x,y)
-  'UA()=tile,UC()=radius,UD()=damage
-  Local i=findslot()
-  If i<32 Then
-    UT(i)=74:UX(i)=x:UY(i)=y:UA(i)=247:UC(i)=2:UD(i)=11
-    '    writecomment("you blew a canister")
+  'create a small explosion
+Sub small_explosion(i)
+  Local j
+  j=findslot()
+  If j<32 Then
+    UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
+    Play modsample s_dsbarexp,4
   EndIf
 End Sub
   
   
-Sub place_magnet
-  'UA()=sprite,UB()=duration in loops (around 15 seconds)
-  Local i=findslot()
-  If i<32 Then
-    UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=120
-    Inc pl_ma,-1:show_item
-    writecomment("you placed a magnet")
+  'small animation, uses part of the explosion tiles
+sub zap(i)
+  Local j
+  j=findslot()
+  If j<32 Then
+    UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=250  'short zap...
+    Play modsample s_shock,4
   EndIf
-End Sub
+end sub
   
-  'animates the trash compactor
-sub crush(i,x,y)
-  static c
-  c=1-c 'slow down
-  if c then
-    if UB(i)=4 then anim_tc(x,y,&h90,&h91,&h94,&h94):UB(i)=0
-    if UB(i)=3 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=4
-    if UB(i)=2 then anim_tc(x,y,&h98,&h99,&h9C,&h9D):UB(i)=3
-    if UB(i)=1 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=2
+  
+  'starts animation showing explosion
+sub explosion(i)
+  if pl_wp=2 then 'plasma explosion 11 dmg radius 2
+    Local j=findslot()
+    If j<32 Then UT(j)=74:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247:UB(j)=24:UC(j)=3:UD(j)=11
+  else
+    small_explosion(i) 'pistol explosion
   end if
 end sub
   
-  'replaces 4 tiles of the trash compactor
-sub anim_tc(x,y,a,b,c,d)
-  MID$(lv$(y-1),x+1,1)=Chr$(a)
-  MID$(lv$(y-1),x+2,1)=Chr$(b)
-  MID$(lv$(y),x+1,1)=Chr$(c)
-  MID$(lv$(y),x+2,1)=Chr$(d)
-End Sub
-  
-end sub
-  
-Sub open_elev(i,dx,dy)
-  Local u_b=UB(i)
-  If u_b=5 Then Play modsample s_door,4
-  If u_b=1 Then anim_h_door(dx,dy,182,9,&hAC):UB(i)=2
-  If u_b=0 Then anim_h_door(dx,dy,181,89,&hAD):UB(i)=1
-  If u_b=5 Then anim_h_door(dx,dy,84,85,&hAE):UB(i)=0
-End Sub
-  
-Sub close_elev(i,dx,dy)
-  Local u_b=UB(i)
-  If u_b=2 Then Play modsample s_door,4
-  If u_b=4 Then anim_h_door(dx,dy,80,81,&hAE):UB(i)=5
-  If u_b=3 Then anim_h_door(dx,dy,84,85,&hAD):UB(i)=4
-  If u_b=2 Then anim_h_door(dx,dy,181,89,&hAC):UB(i)=3
-End Sub
-  
-  'door is closed, and is open at the end of this animation
-Sub open_door(i,dx,dy)
-  Local u_b=UB(i)
-  If u_b=5 Then Play modsample s_door,4
-  If UA(i)=1 Then 'vertical door
-    If u_b=1 Then anim_v_door(dx,dy,27,9,15):UB(i)=2
-    If u_b=0 Then anim_v_door(dx,dy,70,74,78):UB(i)=1
-    If u_b=5 Then anim_v_door(dx,dy,69,73,77):UB(i)=0
-  Else 'horizontal door
-    If u_b=1 Then anim_h_door(dx,dy,17,9,91):UB(i)=2
-    If u_b=0 Then anim_h_door(dx,dy,88,89,86):UB(i)=1
-    If u_b=5 Then anim_h_door(dx,dy,84,85,86):UB(i)=0
-  EndIf
-End Sub
-  
-  'door is open, and is closed at the end of this animation
-Sub close_door(i,dx,dy)
-  '  if Asc(Mid$(lv$(dy),dx+1,1))<>9 then UB(i)=5 'skip close when blocked
-  Local u_b=UB(i)
-  If u_b=2 Then Play modsample s_door,4
-  If UA(i)=1 Then 'vertical door
-    If u_b=4 Then anim_v_door(dx,dy,dpm(UC(i),1),72,76):UB(i)=5
-    If u_b=3 Then anim_v_door(dx,dy,69,73,77):UB(i)=4
-    If u_b=2 Then anim_v_door(dx,dy,70,74,78):UB(i)=3
-  Else 'horizontal door
-    If u_b=4 Then anim_h_door(dx,dy,80,81,dpm(UC(i),0)):UB(i)=5
-    If u_b=3 Then anim_h_door(dx,dy,84,85,86):UB(i)=4
-    If u_b=2 Then anim_h_door(dx,dy,88,89,86):UB(i)=3
-  EndIf
-End Sub
-  
-  'update the world map with the current vertical door tiles
-Sub anim_v_door(dx,dy,a,b,c)
-  MID$(lv$(dy-1),dx+1,1)=Chr$(a)
-  MID$(lv$(dy),dx+1,1)=Chr$(b)
-  MID$(lv$(dy+1),dx+1,1)=Chr$(c)
-End Sub
-  
-  'update the world map with the current horizontal door tiles
-Sub anim_h_door(dx,dy,a,b,c)
-  MID$(lv$(dy),dx,1)=Chr$(a)
-  MID$(lv$(dy),dx+1,1)=Chr$(b)
-  MID$(lv$(dy),dx+2,1)=Chr$(c)
-End Sub
-  
-  
-  'subs to support player handling ------------------------------------
   
   'find a free slot in the UNIT array (28...31)
 Function findslot()
@@ -1241,33 +1279,55 @@ Function findslot()
   findslot=i
 End Function
   
-  'create a small explosion at location
-Sub small_explosion(i)
-  Local j
-  j=findslot()
-  If j<32 Then
-    UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247  'explosion
-    Play modsample s_dsbarexp,4
+  
+  'is there a robot/player on this location in the map (255=fail)
+Function has_unit(x,y)
+  Local i=0
+  has_unit=255
+  Do
+    If UT(i)>0 Then
+      If UX(i)=x Then
+        If UY(i)=y Then has_unit=i
+      end if
+    end if
+    Inc i,1
+  Loop Until i=28
+End Function
+  
+  
+  
+  
+  'subs to support player handling ------------------------------------
+  
+  'update player parameters in unit attributes
+Sub update_player
+  Local i
+  Static oldhealth
+  UX(0)=xp:UY(0)=yp
+  If oldhealth<>UH(0) Then
+    Sprite memory health_index(Min(Int((12-UH(0))/2),5)),272,160
+    oldhealth=UH(0)
+    For i=1 To 12
+      If i > oldhealth Then
+        Box 267+4*i,220,3,5,1,bckgnd,bckgnd
+      Else
+        Box 267+4*i,220,3,5,1,textc,textc
+      EndIf
+    Next
+    If UH(0)=0 Then
+      UA(0)=&h4C 'dead sprite
+    EndIf
   EndIf
 End Sub
   
-sub zap(i)
-  Local j
-  j=findslot()
-  If j<32 Then
-    UT(j)=11:UX(j)=UX(i):UY(j)=UY(i):UA(j)=250  'short zap...
-    Play modsample s_shock,4
-  EndIf
-end sub
   
-sub explosion(i)
-  if pl_wp=2 then 'plasma explosion 11 dmg radius 2
-    Local j=findslot()
-    If j<32 Then UT(j)=74:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247:UB(j)=24:UC(j)=3:UD(j)=11
-  else
-    small_explosion(i) 'pistol explosion
-  end if
-end sub
+  'update player sprites to be used on layer L, depending weapon and direction
+Sub writeplayer(h,v,w)
+  '@harm: use UA(i) as sprite number
+  pl_sp=8*(v=-1)+4*(h=1)+12*(h=-1)        'sprite matching orientation
+  IF UA(0)<48 THEN UA(0)=pl_sp+pl_mv+16*w 'store in UNIT log
+  pl_mv=(pl_mv+1) Mod 4                   'anime player
+End Sub
   
   
   'weapon fire in horizontal direction
@@ -1326,6 +1386,7 @@ Sub fire_ew(p)
     
   EndIf
 End Sub
+  
   
   'weapon fire in vertical direction
 Sub fire_ns(p)
@@ -1386,20 +1447,6 @@ Sub fire_ns(p)
   EndIf
 End Sub
   
-  'is there a robot on this location in the map
-Function has_unit(x,y)
-  Local i=0
-  has_unit=255
-  Do
-    If UT(i)>0 Then
-      If UX(i)=x Then
-        If UY(i)=y Then has_unit=i
-      end if
-    end if
-    Inc i,1
-  Loop Until i=28
-End Function
-  
   
   'find the items in viewer area in the unit attributes
 Sub exec_viewer
@@ -1457,7 +1504,8 @@ Sub exec_viewer
   pl_md=p_w     'at the end, free player
 End Sub
   
-  'move and return to walk mode
+  
+  'move object and return to walk mode
 Sub exec_move
   Local tl$
   tx=ox+h:ty=oy+v   'determine target coordinates
@@ -1480,121 +1528,8 @@ Sub exec_move
   pl_md=p_w                       'at the end, free player
 End Sub
   
-  'generic subs for gameplay -------------------------------------------
-  'write unit position back in unit attributes (also player)
-Sub store_unit_pos(unit,x,y)
-  UX(unit)=x:UY(unit)=y
-End Sub
   
-Sub show_ta(x,y)
-  Text 0,0,Right$("0000000"+Bin$(get_ta(x,y)),8)
-End Sub
-  
-  'calculate achievements
-Sub statistics(b,h)
-  Local ii,jj=0
-  For ii=1 To 27   'check bots
-    If UT(ii)>0 Then Inc jj,1
-  Next
-  b=jj:jj=0
-  For ii=48 To 63  'check secrets
-    If UT(ii)>127 Then Inc jj,1
-  Next
-  h=jj
-End Sub
-  
-  'get tile attribute for this tile
-Function get_ta(x,y)
-  spn=Peek(byte lva+y*129+x+1)+1
-  get_ta=Peek(byte taa+spn)
-End Function
-  
-  'write text in the comment area at bottom screen rolling upwards
-Sub writecomment(a$)
-  Local i
-  For i=0 To 2:comment$(i)=comment$(i+1):Next
-  comment$(3)=Left$(a$+Space$(30),30)
-  For i = 0 To 3
-    Text 10,200+10*i,comment$(i),,,,textc,bckgnd
-  Next
-End Sub
-  
-  'elevator instructions on layer N
-sub ele_instructions(i)
-  le$=left$("|     123456",6+UD(i))+right$("             | DOOR",17-UD(i))
-  writecomment(" ")
-  writecomment("| ELEVATOR PANEL | DOWN")
-  writecomment("|  SELECT LEVEL  | OPENS")
-  writecomment(le$)
-end sub
-  
-  'highlight actual floor layer L
-sub ele_level(i)
-  text 50+8*i,230,str$(i),,,,rgb(white),rgb(magenta)
-end sub
-  
-sub next_floor(h)
-  local i
-  for i=32 to 47 'range where elevators live
-    if UT(i)=19 and UC(i)=pl_el+h then
-      xp=UX(i):yp=UY(i)-1:pl_el=pl_el+h 'go inside this elevator
-      UX(0)=xp:UY(0)=yp
-      exit for 'found new floor
-    endif
-  next
-end sub
-  
-  'scale the world map to overview mode @Martin
-Sub renderLiveMap
-  Local integer mx,my,mp,yy,CL(256)
-  Local t$
-  box 0,24,11*24,7*24,1,0,0 'clear screen
-  'Tile colors
-  T$="00077777977770777770000A0000B0006740694B66EB60E777E722B724B66070"
-  T$=T$+"0367000700770007770000700707077880000007776777077707770778888887"
-  T$=T$+"7067700770000007700400000000000000000730073000000000000CCC0C0C0C"
-  T$=T$+"CC07700770898EEAAA2338677727776777EAAEEAAEE00000000000000000000"
-  For mx=1 To 255:CL(mx)=col(Val("&H"+Mid$(T$,mx,1))):Next
-  For my = 0 To 63
-    mp=Peek(varaddr lv$(my)):yy=44+(my<<1)
-    For mx = 1 To 128
-      Box 4+2*mx,yy,2,2,,CL(Peek(BYTE mp+mx))
-    Next
-  Next
-End Sub
-  
-  'pre-load sound effects @Martin
-Sub preload_sfx
-  'for sfcmetallicbop.mod
-  s_dsbarexp=16:s_dspistol=17:s_beep=18:s_beep2=19:s_cycle_item=20:s_cycle_weapon=21
-  s_door=22:s_emp=23:S_error=24:s_found_item=25:s_magnet2=26:s_medkit=27:s_move=28
-  s_plasma=29:s_shock=30
-End Sub
-  
-  'this animates the fans, flags, water and the servers in the world map
-Sub ani_tiles '@added by Martin
-  'changing the Source adress for the Animated Tiles
-  Static a1,a2,a3
-  If ani_timer=2 Then   'change every second main loop
-    tile_index(196)=tla_index(8+a3)   'large fan 196
-    tile_index(197)=tla_index(10+a3)  'large fan 197
-    tile_index(200)=tla_index(12+a3)  'large fan 200
-    tile_index(201)=tla_index(14+a3)  'large fan 201
-    Inc a3:a3=a3 And 1
-    tile_index(204)=tla_index(20+a2) 'WATER 204
-    Inc a2:a2=a2 And 3
-    ani_timer=0
-  EndIf
-  
-  'these animations change every main loop
-  tile_index(66) = tla_index(a1)    'FLAG 66
-  tile_index(148)=tla_index(4+a1)   'TRASH COMPACTOR 148
-  tile_index(143)=tla_index(16+a1)  'SERVER 143
-  Inc a1: a1=a1 And 3
-  
-  Inc ani_timer
-End Sub
-  
+  'use item visible in frame (bomb/emp etc..)
 Sub use_item
   Local a
   Select Case pl_it
@@ -1626,7 +1561,120 @@ Sub use_item
 End Sub
   
   
+  'elevator instructions on layer N
+sub ele_instructions(i)
+  le$=left$("|     123456",6+UD(i))+right$("             | DOOR",17-UD(i))
+  writecomment(" ")
+  writecomment("| ELEVATOR PANEL | DOWN")
+  writecomment("|  SELECT LEVEL  | OPENS")
+  writecomment(le$)
+end sub
+  
+  
+  'highlight actual floor layer L
+sub ele_level(i)
+  text 50+8*i,230,str$(i),,,,rgb(white),rgb(magenta)
+end sub
+  
+  
+  'move player to the next floor (different location on the flat MAP)
+sub next_floor(h)
+  local i
+  for i=32 to 47 'range where elevators live
+    if UT(i)=19 and UC(i)=pl_el+h then
+      xp=UX(i):yp=UY(i)-1:pl_el=pl_el+h 'go inside this elevator
+      UX(0)=xp:UY(0)=yp
+      exit for 'found new floor
+    endif
+  next
+end sub
+  
+  
+  
+  'generic subs for gameplay -------------------------------------------
+  
+  'write unit position back in unit attributes (also player)
+Sub store_unit_pos(unit,x,y)
+  UX(unit)=x:UY(unit)=y
+End Sub
+  
+  
+  'for debugging
+Sub show_ta(x,y)
+  Text 0,0,Right$("0000000"+Bin$(get_ta(x,y)),8)
+End Sub
+  
+  
+  'calculate achievements
+Sub statistics(b,h)
+  Local ii,jj=0
+  For ii=1 To 27   'check bots
+    If UT(ii)>0 Then Inc jj,1
+  Next
+  b=jj:jj=0
+  For ii=48 To 63  'check secrets
+    If UT(ii)>127 Then Inc jj,1
+  Next
+  h=jj
+End Sub
+  
+  
+  'get tile attribute for this tile
+Function get_ta(x,y)
+  spn=Peek(byte lva+y*129+x+1)+1
+  get_ta=Peek(byte taa+spn)
+End Function
+  
+  
+  'write text in the comment area at bottom screen rolling upwards
+Sub writecomment(a$)
+  Local i
+  For i=0 To 2:comment$(i)=comment$(i+1):Next
+  comment$(3)=Left$(a$+Space$(30),30)
+  For i = 0 To 3
+    Text 10,200+10*i,comment$(i),,,,textc,bckgnd
+  Next
+End Sub
+  
+  
+  'scale the world map to overview mode @Martin
+Sub renderLiveMap
+  Local integer mx,my,mp,yy,CL(256)
+  Local t$
+  box 0,24,11*24,7*24,1,0,0 'clear screen
+  'Tile colors
+  T$="00077777977770777770000A0000B0006740694B66EB60E777E722B724B66070"
+  T$=T$+"0367000700770007770000700707077880000007776777077707770778888887"
+  T$=T$+"7067700770000007700400000000000000000730073000000000000CCC0C0C0C"
+  T$=T$+"CC07700770898EEAAA2338677727776777EAAEEAAEE00000000000000000000"
+  For mx=1 To 255:CL(mx)=col(Val("&H"+Mid$(T$,mx,1))):Next
+  For my = 0 To 63
+    mp=Peek(varaddr lv$(my)):yy=44+(my<<1)
+    For mx = 1 To 128
+      Box 4+2*mx,yy,2,2,,CL(Peek(BYTE mp+mx))
+    Next
+  Next
+End Sub
+  
+  
+sub select_music(a)
+  Play stop
+  select case a
+    case 0,1
+      Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
+    case 2
+      Play modfile "music/rushin_in-sfx-c.mod"   'sfx combined with music
+      '    case 0
+      '      Play modfile "music/get psyched.mod"       'sfx combined with music ?
+    case 3
+      Play modfile "music/petsciisfx.mod"        'only sfx
+  end select
+end sub
+  
+  
+  
   ' subs for game setup -------------------------------------------------
+  
   'loads the world map and tile attributes and unit attributes
 Sub loadworld
   
@@ -1691,6 +1739,16 @@ Sub loadworld
   
 End Sub
   
+  
+  'assign sound effects names
+Sub preload_sfx
+  'for sfcmetallicbop.mod
+  s_dsbarexp=16:s_dspistol=17:s_beep=18:s_beep2=19:s_cycle_item=20:s_cycle_weapon=21
+  s_door=22:s_emp=23:S_error=24:s_found_item=25:s_magnet2=26:s_medkit=27:s_move=28
+  s_plasma=29:s_shock=30
+End Sub
+  
+  
   'read color values and MAP_NAME$
 Sub init_map_support
   'read color values and MAP_NAME$
@@ -1716,6 +1774,7 @@ Sub loadgraphics
   Dim tla_index(&h17)
   Dim key_index(2)
   
+  'read index file. the order must not be changed
   Open "lib/flash_index.txt" For input As #1
   
   For i=0 To &hff
@@ -1836,7 +1895,6 @@ Sub show_intro
                 EndIf
                 Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
                 Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
-                save image "images\strip.bmp",0,85,320,16
                 If Game_Mite Then FRAMEBUFFER Merge 9,b
               EndIf
               Pause 200
@@ -1857,6 +1915,8 @@ Sub show_intro
     Pause 50: 'Contr_input$() is to fast to see what position you are in
   Loop
   Play stop
+  'save image "images\strip.bmp",0,85,320,16
+  sprite read #1,0,85,320,16
 End Sub
   
   
@@ -1920,6 +1980,7 @@ sub config_nes
   setpin gp14,dout:pin(gp14)=1 'power for the NES controller
 end sub
   
+  
   'Settings for Game*Mite
 Sub init_game_ctrl
   Local i%
@@ -1928,6 +1989,7 @@ Sub init_game_ctrl
     SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
   Next
 End Sub
+  
   
   'this is for the parallel key layout of the game_mite
 Function contr_input$()
@@ -1940,6 +2002,7 @@ Function contr_input$()
   Next
   Contr_input$=cs$
 End Function
+  
   
   'This is for serial 74HC4021 in a NES controller on PicoGameVGA
 Function nes_input$()
@@ -1955,6 +2018,7 @@ Function nes_input$()
   Next
   nes_input$=cs$
 End Function
+  
   
   'Controller to Keyboard translation
 Function c2k$()
@@ -1985,12 +2049,14 @@ Function c2k$()
   EndIf
 End Function
   
+  
 colors:
   '--Colorscheme accordung to Spritecolors
   Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
   Data RGB(MAGENTA),RGB(YELLOW),RGB(WHITE),RGB(MYRTLE)
   Data RGB(COBALT) ,RGB(MIDGREEN),RGB(CERULEAN),RGB(RUST)
   Data RGB(FUCHSIA),RGB(BROWN),RGB(LILAC)
+  
   '
 map_names:
   Data "01-research lab","02-headquarters","03-the village","04-the islands"
@@ -2002,6 +2068,7 @@ map_names:
   ' Font type    : Full (96 Characters)
   ' Font size    : 8x8 pixels
   ' Memory usage : 768
+  
   
 DefineFont #9
   60200808
