@@ -63,6 +63,7 @@
   'write frame
   FRAMEBUFFER Write sc$
   Load image "images/layerb.bmp"
+  load image "images/strip.bmp"
   If Game_Mite Then FRAMEBUFFER Merge 9
   
   'start music/sfx modfile
@@ -122,12 +123,14 @@
         Select Case pl_md
           Case p_w
             If (get_ta(xp+h,yp+v) And b_wlk) Then 'check if we can walk, then walk
-              xp=xp+h:yp=yp+v               'new player position
-              xp=Min(Max(xp,5),hsize-6)     'don't fall off the map
-              yp=Min(Max(yp,3),vsize-4)
-              store_unit_pos(0,xp,yp)       'store pos for future use
-              writeplayer(h,v,pl_wp)        'update player tile
-              vp=v:hp=h
+              if has_unit(xp+h,yp+v)=255 then
+                xp=xp+h:yp=yp+v               'new player position
+                xp=Min(Max(xp,5),hsize-6)     'don't fall off the map
+                yp=Min(Max(yp,3),vsize-4)
+                store_unit_pos(0,xp,yp)       'store pos for future use
+                writeplayer(h,v,pl_wp)        'update player tile
+                vp=v:hp=h
+              end if
             EndIf
           Case p_s1 'executing the search mode, player facing search direction
             pl_md=p_s2
@@ -257,10 +260,11 @@
   game_end
   if Game_Mite then framebuffer copy f,n
   
-  pause 5000:play stop
-  if not Game_Mite then mode 1
+  pause 5000:play stop:run
   
-  Memory
+  '  if not Game_Mite then mode 1
+  '  Memory
+  
 End
   
   
@@ -274,91 +278,97 @@ Sub writesprites_l
   CLS  col(5)  'start with a clean sheet
   For i=0 To 27
     dx=UX(i)-UX(0):dy=UY(i)-UY(0)
-    If Abs(dx)<=xm And Abs(dy)<=ym Then 'is it visible ?
-      Select Case UT(i)
-        Case 0  'do nothing, but exit select faster
-        Case 1  'player
-          If UH(i)>0 Then
-            Sprite memory sprite_index(UA(i)),xs,ys,9
-          Else
-            If UA(i)>&h52 Then
-              game_over              'show end text
-            Else
+    If Abs(dx)<=xm then
+      if Abs(dy)<=ym Then 'is it visible ?
+        Select Case UT(i)
+          Case 0  'do nothing, but exit select faster
+          Case 1  'player
+            If UH(i)>0 Then
               Sprite memory sprite_index(UA(i)),xs,ys,9
-              h_beat=min(h_beat+40,400):
-              Inc UA(i),1 'slow down all, next sprite
+            Else
+              If UA(i)>&h52 Then
+                game_over              'show end text
+              Else
+                Sprite memory sprite_index(UA(i)),xs,ys,9
+                h_beat=min(h_beat+40,400):
+                Inc UA(i),1 'slow down all, next sprite
+              EndIf
             EndIf
-          EndIf
-        Case 2,3,4
-          If UH(i)>0 Then
-            Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
-          Else
-            Sprite memory sprite_index(&h49),xs+24*dx,ys+24*dy,9  'dead bot
-          EndIf
-        case 5 'bot drowning
-          Sprite memory tile_index(UA(i)),xs+24*dx,ys+24*dy,0
-        Case 9
-          If UH(i)>0 Then
-            Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
-          Else
-            Sprite memory sprite_index(&h4B),xs+24*dx,ys+24*dy,9  'dead bot
-          EndIf
-        Case 17,18
-          If UH(i)>0 Then
-            Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
-          Else
-            Sprite memory sprite_index(&h4A),xs+24*dx,ys+24*dy,9  'dead bot
-          EndIf
-      End Select
-    EndIf
+          Case 2,3,4
+            If UH(i)>0 Then
+              Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+            Else
+              Sprite memory sprite_index(&h49),xs+24*dx,ys+24*dy,9  'dead bot
+            EndIf
+          case 5 'bot drowning
+            Sprite memory tile_index(UA(i)),xs+24*dx,ys+24*dy,0
+          Case 9
+            If UH(i)>0 Then
+              Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+            Else
+              Sprite memory sprite_index(&h4B),xs+24*dx,ys+24*dy,9  'dead bot
+            EndIf
+          Case 17,18
+            If UH(i)>0 Then
+              Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+            Else
+              Sprite memory sprite_index(&h4A),xs+24*dx,ys+24*dy,9  'dead bot
+            EndIf
+        End Select
+      EndIf
+    end if
   Next
   For i=28 To 31
     dx=UX(i)-UX(0):dy=UY(i)-UY(0)
-    If Abs(dx)<=xm And Abs(dy)<=ym Then 'is it visible ?
-      Select Case UT(i)
-        Case 11 'small explosion
-          Sprite memory tile_index(UA(i)),xs+24*dx,ys+24*dy,0
-        Case 12 'shoot up
-          UT(i)=0 'shot fired -> clear
-          For j=UD(i) To UC(i) Step -1
-            Sprite memory tile_index(UA(i)),xs,ys+24*j,0
-          Next
-        Case 13 'shoot down
-          UT(i)=0 'shot fired -> clear
-          For j=UD(i) To UC(i)
-            Sprite memory tile_index(UA(i)),xs,ys+24*j,0
-          Next
-        Case 14 'shoot left
-          UT(i)=0 'shot fired -> clear
-          For j=UD(i) To UC(i) Step -1
-            Sprite memory tile_index(UA(i)),xs+24*j,ys,0
-          Next
-        Case 15 'shoot right
-          UT(i)=0 'shot fired -> clear
-          For j=UD(i) To UC(i)
-            Sprite memory tile_index(UA(i)),xs+24*j,ys,0
-          Next
-        Case 70' a special case where UX and UY are absolute coordinates
-          If pl_md<>p_m2 Then UT(i)=0             'free slot after use
-          Sprite memory sprite_index(UA(i)),UB(i),UC(i),9
-        Case 71 'bomb visible
-          If UB(i)>0 Then
-            Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
-          Else
+    If Abs(dx)<=xm then
+      if Abs(dy)<=ym Then 'is it visible ?
+        Select Case UT(i)
+          Case 11 'small explosion
+            Sprite memory tile_index(UA(i)),xs+24*dx,ys+24*dy,0
+          Case 12 'shoot up
+            UT(i)=0 'shot fired -> clear
+            For j=UD(i) To UC(i) Step -1
+              Sprite memory tile_index(UA(i)),xs,ys+24*j,0
+            Next
+          Case 13 'shoot down
+            UT(i)=0 'shot fired -> clear
+            For j=UD(i) To UC(i)
+              Sprite memory tile_index(UA(i)),xs,ys+24*j,0
+            Next
+          Case 14 'shoot left
+            UT(i)=0 'shot fired -> clear
+            For j=UD(i) To UC(i) Step -1
+              Sprite memory tile_index(UA(i)),xs+24*j,ys,0
+            Next
+          Case 15 'shoot right
+            UT(i)=0 'shot fired -> clear
+            For j=UD(i) To UC(i)
+              Sprite memory tile_index(UA(i)),xs+24*j,ys,0
+            Next
+          Case 70' a special case where UX and UY are absolute coordinates
+            If pl_md<>p_m2 Then UT(i)=0             'free slot after use
+            Sprite memory sprite_index(UA(i)),UB(i),UC(i),9
+          Case 71 'bomb visible
+            If UB(i)>0 Then
+              Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+            Else
+              show_explosion(UA(i),dx,dy,UC(i)) 'explosions in radius < UC
+            EndIf
+          Case 72 'magnet visible
+            If UB(i)>0 Then Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
+          case 73 'emp
+            if UB(i)<2 then box 0,24,11*24,7*24,,rgb(lilac),rgb(lilac)
+          Case 74
             show_explosion(UA(i),dx,dy,UC(i)) 'explosions in radius < UC
-          EndIf
-        Case 72 'magnet visible
-          If UB(i)>0 Then Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
-        case 73 'emp
-          if UB(i)<2 then box 0,24,11*24,7*24,,rgb(lilac),rgb(lilac)
-        Case 74
-          show_explosion(UA(i),dx,dy,UC(i)) 'explosions in radius < UC
-      end select
+        end select
+      end if
     end if
   next
   For i=32 To 47
-    if UT(i)=19 and UX(i)=UX(0) and UY(i)=UY(0)+1 then 'elevator
-      ele_level(pl_el)
+    if UT(i)=19 then
+      if UX(i)=UX(0) and UY(i)=UY(0)+1 then 'elevator
+        ele_level(pl_el)
+      end if
     end if
   next
   FRAMEBUFFER write sc$
@@ -382,10 +392,12 @@ Sub show_explosion(t,x,y,r) 'show explosion inside view window
   rr=r-1 'smaller than radius
   For i=-rr To rr
     For j=-rr To rr
-      If Abs(i+x)<=xm And Abs(j+y)<=ym Then
-        If (get_ta(xp+i+x,yp+j+y) And (b_wlk+b_hov)) Then
-          Sprite memory tile_index(t),xs+24*(i+x),ys+24*(j+y),0
-        EndIf
+      If Abs(i+x)<=xm then
+        if Abs(j+y)<=ym Then
+          If (get_ta(xp+i+x,yp+j+y) And (b_wlk+b_hov)) Then
+            Sprite memory tile_index(t),xs+24*(i+x),ys+24*(j+y),0
+          EndIf
+        endif
       EndIf
     Next
   Next
@@ -434,12 +446,12 @@ End Sub
 sub select_music(a)
   Play stop
   select case a
-    case 1
+    case 0,1
       Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
     case 2
       Play modfile "music/rushin_in-sfx-c.mod"   'sfx combined with music
-    case 0
-      Play modfile "music/get psyched.mod"       'sfx combined with music ?
+      '    case 0
+      '      Play modfile "music/get psyched.mod"       'sfx combined with music ?
     case 3
       Play modfile "music/petsciisfx.mod"        'only sfx
   end select
@@ -500,7 +512,7 @@ End Sub
 Sub target_move
   ox=xp+h:oy=yp+v             'map coordinates of object to be moved
   hm=h:vm=v                   'global for use later
-  If (get_ta(ox,oy) And b_mov) = b_mov Then     'can object be moved?
+  If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
     sprite_item(&h55,24*h+xs,24*v+ys)
   Else
     writecomment("Object cannot be moved")
@@ -801,12 +813,12 @@ Sub AI_units
         If UB(i)<0 Then
           UT(i)=0 'free slot
         Else
-          if nearx=0 and neary=0 then 'pick up magnet
+          if dx=0 and dy=0 then 'pick up magnet
             UT(i)=0:inc pl_ma,1:show_item
           else
             'check for robot contact with magnet
             j=has_unit(UX(i),UY(i))
-            if j>0 then 'mark robot
+            if j>0 and j<255 then 'mark robot
               UT(i)=0:UC(j)=2 'magnet used, bot move direction random
               play modsample s_magnet2,4
             end if
@@ -816,10 +828,14 @@ Sub AI_units
         if UB(i)<24 then  'freeze robots 3 seconds
           if em_on=0 then 'only once
             for j=1 to 27 'hoverbots within EMP range
-              if UT(j)<5 and abs(UX(j)-xp)<5 and abs(UY(j)-yp)<5 then 
-                'if water then drawn
-                if ASC(MID$(lv$(UY(j)),UX(j)+1,1))=&hCC then UT(j)=5:UA(j)=&h8C
-              end if
+              if UT(j)<5 then
+                if abs(UX(j)-xp)<5 then
+                  if abs(UY(j)-yp)<5 then
+                    'if water then drawn
+                    if ASC(MID$(lv$(UY(j)),UX(j)+1,1))=&hCC then UT(j)=5:UA(j)=&h8C
+                  endif
+                endif
+              endif
             next
           end if
           em_on=1
@@ -877,9 +893,11 @@ Sub AI_units
       case 16 'trash compactor
         if asc(mid$(lv$(UY(i)),UX(i)+1,1))=148 then 'no object, check for unit/robot
           j=has_unit(UX(i),UY(i))
-          if j>0 and UH(j)>0 then
-            UB(i)=1:play modsample s_door,4 'start animation
-            UH(j)=0:UT(j)=0 'kill robot immediately, and remove from play
+          if j<255 then
+            if UH(j)>0 then
+              UB(i)=1:play modsample s_door,4 'start animation
+              UH(j)=0:UT(j)=0 'kill item immediately, and remove from play
+            end if
           end if
         else 'object in TC, crush it...
           if UB(i)=0 then UB(i)=1:play modsample s_door,4 'start animation
@@ -940,16 +958,24 @@ sub dazzle_bot(i)
         case 0 'nothing
         case 1
           xy=UX(i)+1
-          If (get_ta(xy,UY(i)) And b_wlk)>0 and Not(dy=0 And xy=xp) Then inc UX(i),1
+          If (get_ta(xy,UY(i)) And b_wlk)>0 then
+            if Not(dy=0 And xy=xp) Then inc UX(i),1
+          endif
         case 2
           xy=UX(i)-1
-          If (get_ta(xy,UY(i)) And b_wlk)>0 and Not(dy=0 And xy=xp) Then inc UX(i),-1
+          If (get_ta(xy,UY(i)) And b_wlk)>0 then
+            if Not(dy=0 And xy=xp) Then inc UX(i),-1
+          end if
         case 3
           xy=UY(i)+1
-          If (get_ta(UX(i),xy) And b_wlk)>0 and Not(xy=yp And dx=0) Then inc UY(i),1
+          If (get_ta(UX(i),xy) And b_wlk)>0 then
+            if Not(xy=yp And dx=0) Then inc UY(i),1
+          end if
         case 4
           xy=UY(i)-1
-          If (get_ta(UX(i),xy) And b_wlk)>0 and Not(xy=yp And dx=0) Then inc UY(i),-1
+          If (get_ta(UX(i),xy) And b_wlk)>0 then
+            if Not(xy=yp And dx=0) Then inc UY(i),-1
+          end if
       end select
     else 'end of dazzle
       UC(i)=0 'notmal walking direction
@@ -962,7 +988,7 @@ Sub bot_shoot_h(i,dx)
   'UB()=counter, only shoot 1x per second
   Local t,j,x,p=1-2*(dx<0)  'if dx<0 then p=-1 if dx>0 then p=+1
   
-  If Abs(dx)<xm then
+  If Abs(dx)<=xm then
     'a shot is possible
     j=findslot() 'fire line
     If j<32 Then
@@ -1006,7 +1032,7 @@ Sub bot_shoot_v(i,dy)
   'UB()=counter, only shoot 1x per second
   Local t,j,y,p=1-2*(dy<0)  'if dy<0 then p=-1 if dy>0 then p=+1
   
-  If Abs(dy)<ym then
+  If Abs(dy)<=ym then
     'a shot is possible
     j=findslot() 'fire line
     If j<32 Then
@@ -1051,11 +1077,15 @@ Sub do_damage(x,y,r,d)
   Local i,j,a,rr
   
   For i=0 To 27 'all units
-    If Abs(UX(i)-x)<r And Abs(UY(i)-y)<r Then UH(i)=Max(UH(i)-d,0)
+    If Abs(UX(i)-x)<r then
+      if Abs(UY(i)-y)<r Then UH(i)=Max(UH(i)-d,0)
+    endif
   Next
   
   For i=48 To 63  'hidden content
-    If Abs(UX(i)-x)<r And Abs(UY(i)-y)<r Then UT(i)=0 'remove hidden item
+    If Abs(UX(i)-x)<r then
+    if Abs(UY(i)-y)<r Then UT(i)=0 'remove hidden item
+    endif
   Next
   
   rr=r-1 'tiles only inside radius
@@ -1258,7 +1288,7 @@ Sub fire_ew(p)
         Inc x,p:t=get_ta(xp+x,yp):UX(i)=xp+x 'next tile n/s
         
         j=has_unit(UX(i),UY(i))
-        If j Then' if robot then damage it
+        If j<255 Then' if robot then damage it
           explosion(i)
           if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
@@ -1316,7 +1346,7 @@ Sub fire_ns(p)
         Inc y,p:t=get_ta(xp,yp+y):UY(i)=yp+y 'next tile n/s
         
         j=has_unit(UX(i),UY(i))
-        If j Then 'if robot then damage it
+        If j<255 Then 'if robot then damage it
           explosion(i)
           if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
@@ -1358,10 +1388,14 @@ End Sub
   
   'is there a robot on this location in the map
 Function has_unit(x,y)
-  Local i=1
-  has_unit=0
+  Local i=0
+  has_unit=255
   Do
-    If UX(i)=x And UY(i)=y And UT(i)>0 Then has_unit=i
+    If UT(i)>0 Then
+      If UX(i)=x Then
+        If UY(i)=y Then has_unit=i
+      end if
+    end if
     Inc i,1
   Loop Until i=28
 End Function
@@ -1429,16 +1463,16 @@ Sub exec_move
   tx=ox+h:ty=oy+v   'determine target coordinates
   
   'check if a move can be executed between object and target
-  If (get_ta(tx,ty) And b_pus) Then     'you can push towards this position
-    'if (is there not a unit on this tile) then
-    'execute the move on the world map (swap tiles)
-    tl$ = Mid$(lv$(ty),tx+1,1)
-    MID$(lv$(ty),tx+1,1)=Mid$(lv$(oy),ox+1,1)
-    If Asc(tl$)=148 Then tl$=Chr$(9)  'if trash compactor then floor
-    MID$(lv$(oy),ox+1,1)=tl$
-    'play sound
-    Play modsample s_move,4
-    'end if
+  If (get_ta(tx,ty) And b_pus) Then 'you can push towards this position
+    if has_unit(tx,ty)=255 then 'no unit here
+      'execute the move on the world map (swap tiles)
+      tl$ = Mid$(lv$(ty),tx+1,1)
+      MID$(lv$(ty),tx+1,1)=Mid$(lv$(oy),ox+1,1)
+      If Asc(tl$)=148 Then tl$=Chr$(9)  'if trash compactor then floor
+      MID$(lv$(oy),ox+1,1)=tl$
+      'play sound
+      Play modsample s_move,4
+    end if
   Else
     writecomment("Object cannot move here")
     Play modsample s_error,4
@@ -1802,6 +1836,7 @@ Sub show_intro
                 EndIf
                 Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
                 Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
+                save image "images\strip.bmp",0,85,320,16
                 If Game_Mite Then FRAMEBUFFER Merge 9,b
               EndIf
               Pause 200
