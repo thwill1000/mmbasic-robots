@@ -4,7 +4,7 @@
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Const nesPG1=0
+  Const nesPG1=1
   
   If Game_Mite Then
     sc$="f":init_game_ctrl ' Init Controller on Game*Mite
@@ -135,7 +135,7 @@
                 xp=xp+h:yp=yp+v               'new player position
                 xp=Min(Max(xp,5),hsize-6)     'don't fall off the map
                 yp=Min(Max(yp,3),vsize-4)
-                store_unit_pos(0,xp,yp)       'store pos for future use
+                UX(unit)=x:UY(unit)=y         'store pos for future use
                 writeplayer(h,v,pl_wp)        'update player tile
                 vp=v:hp=h
               end if
@@ -574,6 +574,7 @@ Sub target_move
   hm=h:vm=v                   'global for use later
   If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
     sprite_item(&h55,24*h+xs,24*v+ys)
+    pause 50 'tuned for nes controller
   Else
     writecomment("Object cannot be moved")
     Play modsample s_error,4
@@ -1587,13 +1588,7 @@ end sub
   
   
   'generic subs for gameplay -------------------------------------------
-  
-  'write unit position back in unit attributes (also player)
-Sub store_unit_pos(unit,x,y)
-  UX(unit)=x:UY(unit)=y
-End Sub
-  
-  
+ 
   'for debugging
 Sub show_ta(x,y)
   Text 0,0,Right$("0000000"+Bin$(get_ta(x,y)),8)
@@ -1806,7 +1801,7 @@ Sub show_intro
   Sprite 28,18,28,10,88,24:Box 32,21,80,34,,0,0
   
   FRAMEBUFFER write l: fade_in: :FRAMEBUFFER write sc$
-  Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t
+  Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
   Local Message$(4) length 40
   
   'set Map to 0, Menu State to 1
@@ -1838,70 +1833,72 @@ Sub show_intro
   Do
     If flip=0 Then Inc MT:If mt>Len(MSG$) Then MT=0
     tp$=Mid$(MSG$,1+MT,41)
-    'If flip Then Inc MT:If mt>Len(MSG$) Then MT=0
-    k$=Inkey$:If k$="" Then k$=c2k$()
-    If k$<>"" Then
-      If k$=Chr$(129) Then Inc MS,(MS<4)
-      If k$=Chr$(128) Then Inc MS,-(MS>1)
-      If k$=" " Then
-        Select Case MS
-          Case 1
-            FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
-            Exit 'intro and go on with the Program
-          Case 2
-            'select map
-            kill_kb
-            Text 0,224,message$(2),,,,col(3)
-            Do
-              k$=Inkey$:If k$="" Then k$=c2k$()
-              If  k$<>""  Then
-                If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
-                If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
-                If k$=" "  Then
-                  Text 0,224,message$(1),,,,col(3): Exit
+    if t2=0 then 'once every 4 cycles
+      k$=Inkey$:If k$="" Then k$=c2k$()
+      If k$<>"" Then
+        If k$=Chr$(129) Then Inc MS,(MS<4)
+        If k$=Chr$(128) Then Inc MS,-(MS>1)
+        If k$=" " Then
+          Select Case MS
+            Case 1
+              FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
+              Exit 'intro and go on with the Program
+            Case 2
+              'select map
+              kill_kb
+              Text 0,224,message$(2),,,,col(3)
+              Do 
+                k$=Inkey$:If k$="" Then k$=c2k$()
+                If  k$<>""  Then
+                  If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
+                  If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
+                  If k$=" "  Then
+                    Text 0,224,message$(1),,,,col(3): Exit
+                  EndIf
+                  Text 9,70,UCase$(map_nam$(Map_Nr))
+                  If Game_Mite Then FRAMEBUFFER merge 9,b
                 EndIf
-                Text 9,70,UCase$(map_nam$(Map_Nr))
-                If Game_Mite Then FRAMEBUFFER merge 9,b
-              EndIf
-              Pause 200
-            Loop
-            kill_kb
-          Case 3
-            'select DIFFICULTY
-            kill_kb
-            Text 0,224,message$(3),,,,col(3)
-            Do
-              k$=Inkey$:If k$="" Then k$=c2k$()
-              If  k$<>"" Then
-                If k$=" " Then
-                  Text 0,224,message$(1),,,,col(3)
-                  Text 0,232,"      "
-                  
-                  Exit
+                Pause 200
+              Loop
+              kill_kb
+            Case 3
+              'select DIFFICULTY
+              kill_kb
+              Text 0,224,message$(3),,,,col(3)
+              Do
+                k$=Inkey$:If k$="" Then k$=c2k$()
+                If  k$<>"" Then
+                  If k$=" " Then
+                    Text 0,224,message$(1),,,,col(3)
+                    Text 0,232,"      "
+                    
+                    Exit
+                  EndIf
+                  If k$=Chr$(130) Then
+                    Inc Diff_Level,-(Diff_Level>0)
+                  EndIf
+                  If k$=Chr$(131) Then
+                    Inc Diff_Level,(Diff_Level<2)
+                  EndIf
+                  Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
+                  Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
+                  If Game_Mite Then FRAMEBUFFER Merge 9,b
                 EndIf
-                If k$=Chr$(130) Then
-                  Inc Diff_Level,-(Diff_Level>0)
-                EndIf
-                If k$=Chr$(131) Then
-                  Inc Diff_Level,(Diff_Level<2)
-                EndIf
-                Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
-                Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
-                If Game_Mite Then FRAMEBUFFER Merge 9,b
-              EndIf
-              Pause 200
-            Loop
-            kill_kb
-          Case 4
-            'select CONTROLS
-        End Select
-      EndIf
+                Pause 200
+              Loop
+              kill_kb
+            Case 4
+              'select CONTROLS
+          End Select
+        EndIf
+      endif
     EndIf
     
     show_menu MS,col(puls(t))
     
     Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) and 3
-    Inc t: t=t Mod 12
+    Inc t: t=t Mod 12 'color change
+    inc t2: t2=t2 mod 3 'reponse time keys
     If Game_Mite Then FRAMEBUFFER Merge 9,b
     Pause 50
   Loop
@@ -1913,7 +1910,7 @@ End Sub
 Sub kill_kb
   Local k$
   Do
-    k$=Inkey$:If k$="" Then k$=c2k$()
+    k$=Inkey$':If k$="" Then k$=c2k$()
   Loop Until k$=""
 End Sub
   
