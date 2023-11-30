@@ -4,7 +4,7 @@
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Const nesPG1=0 'NES controller connected to PicoGameVGA ?
+  Dim nesPG1=0 'NES controller connected to PicoGameVGA ?
   
   If Game_Mite Then
     nesPG1=0:sc$="f":init_game_ctrl ' Init Controller on Game*Mite
@@ -28,7 +28,8 @@
   
   
   'start of the actual game -----------------------------------
-  CLS
+  loading 'show message on L
+  '  CLS
   
   'get world map
   loadworld
@@ -175,14 +176,14 @@
           pl_it=(pl_it+1) Mod 5
           show_item
           Play modsample s_cycle_item,4
-'        Case 147 'F3 cheat key as long as you are alive
-'          if UH(0)>0 then
-'            UH(0)=12                      'full life
-'            pl_ky=7:show_keys             'all keys
-'            pl_pa(1)=100:pl_pa(2)=100     'much ammo
-'            pl_bo=100:pl_em=100:pl_ma=100 'all items
-'            pl_mk=100                     'full medkit
-'          end if
+          'Case 147 'F3 cheat key as long as you are alive
+          'if UH(0)>0 then
+          'UH(0)=12                      'full life
+          'pl_ky=7:show_keys             'all keys
+          'pl_pa(1)=100:pl_pa(2)=100     'much ammo
+          'pl_bo=100:pl_em=100:pl_ma=100 'all items
+          'pl_mk=100                     'full medkit
+          'end if
         Case 9 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
@@ -440,6 +441,16 @@ Sub game_over
 End Sub
   
   
+  'loading popup in L
+Sub loading
+  framebuffer write L
+  Box 120,108,72,24,1,col(7),0
+  Text 128,116,"LOADING",,,,col(7),0
+  framebuffer write sc$
+  cls
+End Sub
+  
+  
   'game end screen and statitics
 Sub game_end
   FRAMEBUFFER write l:CLS
@@ -586,7 +597,7 @@ Sub place_bomb
   'UA()=sprite,UB()=delay in loops (3 sec),UC()=radius,UD()=damage
   Local i=findslot()
   If i<32 Then
-    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=24:UC(i)=3:UD(i)=11
+    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=30:UC(i)=3:UD(i)=11
     Inc pl_bo,-1:show_item
     writecomment("you placed a bomb")
   EndIf
@@ -606,7 +617,7 @@ Sub place_magnet
   'UA()=sprite,UB()=duration in loops (around 15 seconds)
   Local i=findslot()
   If i<32 Then
-    UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=120
+    UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=150
     Inc pl_ma,-1:show_item
     writecomment("you placed a magnet")
   EndIf
@@ -870,7 +881,7 @@ Sub AI_units
           EndIf
         endif
       Case 73 'emp
-        if UB(i)<24 then  'freeze robots 3 seconds
+        if UB(i)<30 then  'freeze robots 3 seconds
           if em_on=0 then 'only once
             for j=1 to 27 'hoverbots within EMP range
               if UT(j)<5 then
@@ -1489,15 +1500,18 @@ Sub exec_viewer
               a$="found "+Str$(UA(i))+" MAGNETS"
           End Select
           writecomment(a$)
-          'if closed box, then open box
-          j=Asc(Mid$(lv$(yp+v1),xp+h1+1,1))
-          If j=&h29 Then j=&h2A
-          If j=&hC7 Then j=&hC6
-          MID$(lv$(yp+v1),xp+h1+1,1)=Chr$(j)
         EndIf
       EndIf
     EndIf
   Next
+  
+  'if closed box, then open box
+  j=Asc(Mid$(lv$(yp+v1),xp+h1+1,1))
+  If j=&h29 Then j=&h2A
+  If j=&h2D Then j=&h2E
+  If j=&hC7 Then j=&hC6
+  MID$(lv$(yp+v1),xp+h1+1,1)=Chr$(j)
+  
   If a$="Nothing found" Then Play Modsample s_error,4:writecomment(a$)
   pl_md=p_w     'at the end, free player
 End Sub
@@ -1516,6 +1530,7 @@ Sub exec_move
       MID$(lv$(ty),tx+1,1)=Mid$(lv$(oy),ox+1,1)
       If Asc(tl$)=148 Then tl$=Chr$(9)  'if trash compactor then floor
       MID$(lv$(oy),ox+1,1)=tl$
+      move_hidden
       Play modsample s_move,4
     end if
   Else
@@ -1524,6 +1539,19 @@ Sub exec_move
   EndIf
   pl_md=p_w                       'at the end, free player
 End Sub
+  
+  
+  'check if a hidden object should move with the box it is in
+sub move_hidden
+  local i
+  for i=48 to 63
+    if UX(i)=ox then
+      if UY(i)=oy then
+        UX(i)=tx:UY(i)=ty
+      endif
+    endif
+  next
+end sub
   
   
   'use item visible in frame (bomb/emp etc..)
@@ -1587,7 +1615,7 @@ end sub
   
   
   'generic subs for gameplay -------------------------------------------
- 
+  
   'for debugging
 Sub show_ta(x,y)
   Text 0,0,Right$("0000000"+Bin$(get_ta(x,y)),8)
@@ -1835,7 +1863,7 @@ Sub show_intro
     if t2=0 then 'once every 4 cycles
       k$=Inkey$:If k$="" Then k$=c2k$()
       If k$<>"" Then
-		play modsample s_beep-2,4
+        play modsample s_beep-2,4
         If k$=Chr$(129) Then Inc MS,(MS<4)
         If k$=Chr$(128) Then Inc MS,-(MS>1)
         If k$=" " Then
@@ -1847,16 +1875,16 @@ Sub show_intro
               'select map
               kill_kb
               Text 0,224,message$(2),,,,col(3)
-              Do 
+              Do
                 k$=Inkey$:If k$="" Then k$=c2k$()
                 If  k$<>""  Then
-				  play modsample s_beep-2,4
+                  play modsample s_beep-2,4
                   If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
                   If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
                   If k$=" "  Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
-				  Text 9,70,"                "
+                  Text 9,70,"                "
                   Text 9,70,UCase$(map_nam$(Map_Nr))
                   If Game_Mite Then FRAMEBUFFER merge 9,b
                 EndIf
@@ -1870,11 +1898,10 @@ Sub show_intro
               Do
                 k$=Inkey$:If k$="" Then k$=c2k$()
                 If  k$<>"" Then
-				  play modsample s_beep-2,4
+                  play modsample s_beep-2,4
                   If k$=" " Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
-                    
                     Exit
                   EndIf
                   If k$=Chr$(130) Then
