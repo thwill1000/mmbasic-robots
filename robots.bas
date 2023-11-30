@@ -1,11 +1,12 @@
   'petrobot testbed picomite VGA V50708RC17 or later
-  
-  
+
+  Option Default Integer
+
   ' system setup -----------------------------------------------------
-  Option default integer
+
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
   Dim nesPG1=0 'NES controller connected to PicoGameVGA ?
-  
+
   If Game_Mite Then
     nesPG1=0:sc$="f":init_game_ctrl ' Init Controller on Game*Mite
   Else
@@ -68,12 +69,12 @@
   
   'write frame around playfield
   FRAMEBUFFER Write sc$
-  Load image "images/layer_b.bmp"  'the actual frame
+  Load image path$("images/layer_b.bmp")  'the actual frame
   If Game_Mite Then FRAMEBUFFER Merge 9
   
   'start music/sfx modfile
   music=1
-  '  Play stop:Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
+  '  Play stop:Play modfile path$("music/sfcmetallicbop2.mod")   'sfx combined with music
   select_music(map_nr mod 3)
   
   'write initial world
@@ -454,7 +455,7 @@ End Sub
   'game end screen and statitics
 Sub game_end
   FRAMEBUFFER write l:CLS
-  pause 100:FRAMEBUFFER write sc$:Load image "images/end.bmp"
+  pause 100:FRAMEBUFFER write sc$:Load image path$("images/end.bmp")
   statistics(left_bots,left_hidden)
   playtime=playtime\1000
   hh=playtime\(3600):hhh$=right$("0"+str$(hh),2)
@@ -466,11 +467,7 @@ Sub game_end
   Text 180,114,Str$(left_hidden)+" / "+Str$(start_hidden)
   Text 180,130,DIFF_LEVEL_WORD$(diff_level)
   Play stop
-  If left_bots Then
-    Play modfile "music/lose.mod"
-  Else
-    Play modfile "music/win.mod"
-  EndIf
+  Play modfile path$("music/" + Choice(left_bots, "lose.mod", "win.mod"))
 End Sub
   
   
@@ -1678,13 +1675,13 @@ sub select_music(a)
   Play stop
   select case a
     case 0,1
-      Play modfile "music/sfcmetallicbop2.mod"   'sfx combined with music
+      Play modfile path$("music/sfcmetallicbop2.mod")   'sfx combined with music
     case 2
-      Play modfile "music/rushin_in-sfx-c.mod"   'sfx combined with music
+      Play modfile path$("music/rushin_in-sfx-c.mod")   'sfx combined with music
       '    case 0
-      '      Play modfile "music/get psyched.mod"       'sfx combined with music ?
+      '      Play modfile path$("music/get psyched.mod")       'sfx combined with music ?
     case 3
-      Play modfile "music/petsciisfx.mod"        'only sfx
+      Play modfile path$("music/petsciisfx.mod")        'only sfx
   end select
 end sub
   
@@ -1712,7 +1709,7 @@ Sub loadworld
   taa=Peek(varaddr TA$)
   
   'load world map and attributes
-  pause 100: Open "data\level-"+Chr$(97+Map_Nr) For input As #1
+  pause 100: Open path$("data/level-"+Chr$(97+Map_Nr)) For input As #1
   
   'load unit attributes in arrays
   For i=0 To 63: UT(i)=Asc(Input$(1,#1)):Next
@@ -1732,7 +1729,7 @@ Sub loadworld
   Close #1
   
   'load destruct paths and tile attributes
-  Open "data\tileset.amiga" For input As #1
+  Open path$("data/tileset.amiga") For input As #1
   dummy$=Input$(2,#1) 'offset
   DP$=Input$(255,#1)  '255 destruct paths
   dummy$=Input$(1,#1) '1 path ignored
@@ -1778,7 +1775,7 @@ Sub loadgraphics
   
   'copy the sprites into a picomite flash slot #4
   'flash slot #3 has the exact same start address as the library
-  flash disk load 3,"lib/pet_lib23.bin",o
+  flash disk load 3, path$("lib/pet_lib23.bin"),o
   
   'load global index file
   Dim sprite_index(&h60)
@@ -1789,7 +1786,7 @@ Sub loadgraphics
   Dim key_index(2)
   
   'read index file. the order must not be changed
-  Open "lib/flash_index.txt" For input As #1
+  Open path$("lib/flash_index.txt") For input As #1
   
   For i=0 To &hff
     Input #1,a$:tile_index(i)=Val(a$)+fl_adr
@@ -1823,7 +1820,7 @@ End Sub
 Sub show_intro
   'load screen
   FRAMEBUFFER write l:CLS :FRAMEBUFFER write sc$
-  Load image "images/introscreen.bmp",0,10
+  Load image path$("images/introscreen.bmp"),0,10
   ' get space for the 4th Menu entry
   Sprite 28,18,28,10,88,24:Box 32,21,80,34,,0,0
   
@@ -1839,7 +1836,7 @@ Sub show_intro
   Map_Nr=0:MS=1:Difficulty=1
   
   ' start playing the intro Music
-  Play Modfile "music\metal_heads-sfx.mod"
+  Play Modfile path$("music/metal_heads-sfx.mod")
   show_menu 1
   
   'Display Map Name
@@ -1911,7 +1908,7 @@ Sub show_intro
                     Inc Diff_Level,(Diff_Level<2)
                   EndIf
                   Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
-                  Load image "images\face_"+Str$(Diff_Level)+".bmp",234,85
+                  Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
                   If Game_Mite Then FRAMEBUFFER Merge 9,b
                 EndIf
                 Pause 200
@@ -2064,7 +2061,12 @@ Function c2k$()
     End Select
   EndIf
 End Function
-  
+
+' Use a function to save 256 bytes of heap that a string would take.
+Function path$(f$)
+  path$ = Choice(Mm.Info(Path) <> "", Mm.Info(Path), Cwd$)
+  If Len(f$) Then Cat path$, "/" + f$
+End Function
   
 colors:
   '--Colorscheme accordung to Spritecolors
