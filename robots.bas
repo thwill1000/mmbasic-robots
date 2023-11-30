@@ -4,16 +4,15 @@
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Const nesPG1=1
+  Const nesPG1=1 'NES controller connected to PicoGameVGA ?
   
   If Game_Mite Then
-    sc$="f":init_game_ctrl ' Init Controller on Game*Mite
+    nesPG1=0:sc$="f":init_game_ctrl ' Init Controller on Game*Mite
   Else
     sc$="n":MODE 2
   EndIf
-  If nesPG1 Then
-    config_nes
-  EndIf
+  If nesPG1 Then config_nes
+  
   
   'screen setup
   If Game_Mite Then FRAMEBUFFER Create 'f
@@ -24,11 +23,11 @@
   
   'game configuration screen show on N ------------------------
   init_map_support
+  preload_sfx
   show_intro
   
   
   'start of the actual game -----------------------------------
-  preload_sfx
   CLS
   
   'get world map
@@ -45,7 +44,7 @@
   'startup defines --------------------------------------------
   
   'heartbeat
-  Dim h_beat=120 'ms
+  Dim h_beat=100 'ms
   
   'define some constants
   Const b_hid=64,b_pus=32,b_see=16,b_dmg=8,b_mov=4,b_hov=2,b_wlk=1  'attrib flags
@@ -574,7 +573,7 @@ Sub target_move
   hm=h:vm=v                   'global for use later
   If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
     sprite_item(&h55,24*h+xs,24*v+ys)
-    pause 50 'tuned for nes controller
+    kill_kb
   Else
     writecomment("Object cannot be moved")
     Play modsample s_error,4
@@ -1836,6 +1835,7 @@ Sub show_intro
     if t2=0 then 'once every 4 cycles
       k$=Inkey$:If k$="" Then k$=c2k$()
       If k$<>"" Then
+		play modsample s_beep-2,4
         If k$=Chr$(129) Then Inc MS,(MS<4)
         If k$=Chr$(128) Then Inc MS,-(MS>1)
         If k$=" " Then
@@ -1850,11 +1850,13 @@ Sub show_intro
               Do 
                 k$=Inkey$:If k$="" Then k$=c2k$()
                 If  k$<>""  Then
+				  play modsample s_beep-2,4
                   If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
                   If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
                   If k$=" "  Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
+				  Text 9,70,"                "
                   Text 9,70,UCase$(map_nam$(Map_Nr))
                   If Game_Mite Then FRAMEBUFFER merge 9,b
                 EndIf
@@ -1868,6 +1870,7 @@ Sub show_intro
               Do
                 k$=Inkey$:If k$="" Then k$=c2k$()
                 If  k$<>"" Then
+				  play modsample s_beep-2,4
                   If k$=" " Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
@@ -1910,7 +1913,7 @@ End Sub
 Sub kill_kb
   Local k$
   Do
-    k$=Inkey$':If k$="" Then k$=c2k$()
+    k$=Inkey$:If k$="" Then k$=c2k$()
   Loop Until k$=""
 End Sub
   
