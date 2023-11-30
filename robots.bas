@@ -4,7 +4,7 @@
   ' system setup -----------------------------------------------------
   Option default integer
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Const nesPG1=1 'NES controller connected to PicoGameVGA ?
+  Const nesPG1=0 'NES controller connected to PicoGameVGA ?
   
   If Game_Mite Then
     nesPG1=0:sc$="f":init_game_ctrl ' Init Controller on Game*Mite
@@ -175,14 +175,14 @@
           pl_it=(pl_it+1) Mod 5
           show_item
           Play modsample s_cycle_item,4
-        Case 147 'F3 cheat key as long as you are alive
-          if UH(0)>0 then
-            UH(0)=12                      'full life
-            pl_ky=7:show_keys             'all keys
-            pl_pa(1)=100:pl_pa(2)=100     'much ammo
-            pl_bo=100:pl_em=100:pl_ma=100 'all items
-            pl_mk=100                     'full medkit
-          end if
+'        Case 147 'F3 cheat key as long as you are alive
+'          if UH(0)>0 then
+'            UH(0)=12                      'full life
+'            pl_ky=7:show_keys             'all keys
+'            pl_pa(1)=100:pl_pa(2)=100     'much ammo
+'            pl_bo=100:pl_em=100:pl_ma=100 'all items
+'            pl_mk=100                     'full medkit
+'          end if
         Case 9 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
