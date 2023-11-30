@@ -5,14 +5,17 @@
   ' system setup -----------------------------------------------------
 
   Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Dim nesPG1=0 'NES controller connected to PicoGameVGA ?
+  Dim read_ctrl$ = ""
 
   If Game_Mite Then
-    nesPG1=0:sc$="f":init_game_ctrl ' Init Controller on Game*Mite
+    read_ctrl$ = "read_gamemite$"
+    sc$="f":init_game_ctrl ' Init Controller on Game*Mite
   Else
     sc$="n":MODE 2
   EndIf
-  If nesPG1 Then config_nes
+
+  ' Uncomment to use NES controller on PicoGAME VGA port A
+  ' read_ctrl$ = "read_nes$"
   
   
   'screen setup
@@ -114,19 +117,17 @@
     'player input through keyboard, clearing buffer, check loop time
     k$="":Text 290,0,Right$("00"+Str$(timer,3,0),3)
     Do
-      tmp$=Inkey$
+      tmp$=read_input$()
       If tmp$<>"" Then k$=tmp$  'keep last valid key
-      If k$="" Then k$=c2k$()
     Loop Until Timer>h_beat
-    playtime=playtime+timer:Timer=0
-    ky=Asc(k$)
+    Inc playtime, Timer : Timer=0
     
     
     If pl_md<p_death Then 'we are live, so let's play the game....
       
       'player controls movement of player character
-      v=(ky=129)-(ky=128)
-      h=(ky=131)-(ky=130)
+      v=(k$ = "down") - (k$ = "up")
+      h=(k$ = "right") - (k$ = "left")
       If h+v<>0 Then                        'any cursor key pressed
         
         Select Case pl_md
@@ -162,18 +163,17 @@
       update_player
       
       
-      'change player mode
-      If k$="y" Or k$="z"  Then pl_md=p_s1   'z initiates search mode
-      If k$="m" Then pl_md=p_m1   'm initiates move mode
-      
-      'player changes items or weapons
-      Select Case ky
-        Case 145 'F1 toggle weapon
+      Select Case k$
+        Case "search" ' Initiate search mode
+          pl_md=p_s1
+        Case "move" ' Initiate move mode
+          pl_md=p_m1
+        Case "toggle-weapon"
           pl_wp=(pl_wp+1) Mod 3
           show_weapon
           writeplayer(hp,vp,pl_wp)
           Play modsample s_cycle_weapon,4
-        Case 146 'F2 toggle item
+        Case "toggle-item"
           pl_it=(pl_it+1) Mod 5
           show_item
           Play modsample s_cycle_item,4
@@ -185,7 +185,7 @@
           'pl_bo=100:pl_em=100:pl_ma=100 'all items
           'pl_mk=100                     'full medkit
           'end if
-        Case 9 'TAB key show map + toggle player/robots
+        Case "map" 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
               map_mode=1      'stop showing normal mode
@@ -203,21 +203,26 @@
       
       'fire weapon
       If shot=1 Then shot=0
-      If k$="w" Then shot=1:fire_ns(-1):writeplayer(0,-1,pl_wp)
-      If k$="a" Then shot=1:fire_ew(-1):writeplayer(-1,0,pl_wp)
-      If k$="s" Then shot=1:fire_ns(1):writeplayer(0,1,pl_wp)
-      If k$="d" Then shot=1:fire_ew(1):writeplayer(1,0,pl_wp)
-      
-      If k$=" " Then use_item  '<SPACE> = use item
-      If k$="M" Then 'toggle music ON/OFF
-        k$=""
-        Play stop:music=1-music
-        If music Then
-          select_music(3) 'only sfx
-        Else
-          select_music(map_nr mod 3) 'any of 3 songs
-        EndIf
-      EndIf
+      Select Case k$
+        Case "fire-up"
+          shot=1:fire_ns(-1):writeplayer(0,-1,pl_wp)
+        Case "fire-left"
+          shot=1:fire_ew(-1):writeplayer(-1,0,pl_wp)
+        Case "fire-down"
+          shot=1:fire_ns(1):writeplayer(0,1,pl_wp)
+        Case "fire-right"
+          shot=1:fire_ew(1):writeplayer(1,0,pl_wp)
+        Case "use-item"
+          use_item()
+        Case "toggle-music"
+          k$="" ' Do we need this ?
+          Play stop:music=1-music
+          If music Then
+            select_music(3) 'only sfx
+          Else
+            select_music(map_nr mod 3) 'any of 3 songs
+          EndIf
+      End Select
       
       'investigate AI UNITs status and activate and process
       AI_units
@@ -253,18 +258,18 @@
       
     EndIf 'pl_md<p_death
     
-    if ky=27 then
+    If k$ = "escape" Then
       writecomment("PAUSE, press <ESC> to quit")
       kill_kb
       do
-        pause 100:k$=inkey$:if k$="" then k$=c2k$()
+        pause 100:k$=read_input$()
       loop while k$=""
-      if k$<>chr$(27) then ky=28:writecomment("continue") 'any value that does not quit
+      If k$ <> "escape" Then k$="" : writecomment("continue") 'any value that does not quit
     end if
     
     If Game_Mite Then FRAMEBUFFER merge 9,b
     
-  Loop Until ky=27   'quit when <esc> is pressed
+  Loop Until k$ = "escape"   'quit when <esc> is pressed
   
   game_end
   if Game_Mite then framebuffer copy f,n
@@ -918,7 +923,7 @@ Sub AI_units
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
             if dx=0 and dy=0 then
               if UC(i)=0 then
-                ky=27 'force game over by simulate pressing ESC
+                k$ = "escape" 'force game over by simulate pressing ESC
               else
                 xp=UC(i):yp=UD(i) 'transport player
               end if
@@ -1858,12 +1863,12 @@ Sub show_intro
     If flip=0 Then Inc MT:If mt>Len(MSG$) Then MT=0
     tp$=Mid$(MSG$,1+MT,41)
     if t2=0 then 'once every 4 cycles
-      k$=Inkey$:If k$="" Then k$=c2k$()
+      k$=read_input$()
       If k$<>"" Then
         play modsample s_beep-2,4
-        If k$=Chr$(129) Then Inc MS,(MS<4)
-        If k$=Chr$(128) Then Inc MS,-(MS>1)
-        If k$=" " Then
+        If k$="down" Then Inc MS,(MS<4)
+        If k$="up" Then Inc MS,-(MS>1)
+        If k$="use-item" Then
           Select Case MS
             Case 1
               FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
@@ -1873,12 +1878,12 @@ Sub show_intro
               kill_kb
               Text 0,224,message$(2),,,,col(3)
               Do
-                k$=Inkey$:If k$="" Then k$=c2k$()
-                If  k$<>""  Then
+                k$=read_input$()
+                If k$<>"" Then
                   play modsample s_beep-2,4
-                  If k$=Chr$(130) Then Inc Map_Nr,-(Map_Nr>0)
-                  If k$=Chr$(131) Then Inc Map_Nr,(Map_Nr<13)
-                  If k$=" "  Then
+                  If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
+                  If k$="right" Then Inc Map_Nr,(Map_Nr<13)
+                  If k$="use-item" Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
                   Text 9,70,"                "
@@ -1893,18 +1898,18 @@ Sub show_intro
               kill_kb
               Text 0,224,message$(3),,,,col(3)
               Do
-                k$=Inkey$:If k$="" Then k$=c2k$()
-                If  k$<>"" Then
+                k$=read_input$()
+                If k$<>"" Then
                   play modsample s_beep-2,4
-                  If k$=" " Then
+                  If k$="use-item" Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
                     Exit
                   EndIf
-                  If k$=Chr$(130) Then
+                  If k$="left" Then
                     Inc Diff_Level,-(Diff_Level>0)
                   EndIf
-                  If k$=Chr$(131) Then
+                  If k$="right" Then
                     Inc Diff_Level,(Diff_Level<2)
                   EndIf
                   Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
@@ -1935,10 +1940,7 @@ End Sub
   
   'remove duplicate keys and key repeat
 Sub kill_kb
-  Local k$
-  Do
-    k$=Inkey$:If k$="" Then k$=c2k$()
-  Loop Until k$=""
+  Do While read_input$() <> "" : Loop
 End Sub
   
   
@@ -1976,9 +1978,37 @@ Sub fade_out
     Pause 50+130*Game_Mite
   Next
 End Sub
-  
-  
-  
+
+Function read_input$()
+  read_input$ = read_inkey$()
+  If Len(read_input$) Then Exit Function
+  read_input$ = Call(read_ctrl$)
+End Function
+
+Function read_inkey$()
+  Select Case Asc(Inkey$)
+    Case 0   : Exit Function
+    Case 9   : read_inkey$ = "map"          ' Tab
+    Case 27  : read_inkey$ = "escape"
+    Case 32  : read_inkey$ = "use-item"     ' Space
+    Case 77  : read_inkey$ = "toggle-music" ' M
+    Case 97  : read_inkey$ = "fire-left"    ' a
+    Case 100 : read_inkey$ = "fire-right"   ' d
+    Case 109 : read_inkey$ = "move"         ' m
+    Case 115 : read_inkey$ = "fire-down"    ' s
+    Case 119 : read_inkey$ = "fire-up"      ' w
+    Case 121, 122 : read_inkey$ = "search"  ' y, z
+    Case 128 : read_inkey$ = "up"
+    Case 129 : read_inkey$ = "down"
+    Case 130 : read_inkey$ = "left"
+    Case 131 : read_inkey$ = "right"
+    Case 145 : read_inkey$ = "toggle-weapon" ' F1
+    Case 146 : read_inkey$ = "toggle-item"   ' F2
+    Case 147 : read_inkey$ = "cheat"         ' F3
+    Case 148 : read_inkey$ = "kill-all"      ' F4
+  End Select
+End Function
+
   '---joystick/Gamepad specific settings
   
   'settings for NES on PicoGameVGA platform port A
@@ -2002,65 +2032,66 @@ Sub init_game_ctrl
     SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
   Next
 End Sub
-  
-  
-  'this is for the parallel key layout of the game_mite
-Function contr_input$()
-  If Not Game_Mite Then Contr_input$="":Exit Function
-  Local  n,ix% = Port(GP8, 8) Xor &h7FFF,cs$="",bit
-  Local m$(7)=("DOWN","LEFT","UP","RIGHT","SELECT","START","BUT-B","BUT-A")
-  ' which buttons are currently pressed
-  For n=0 To 7
-    bit=2^n:If ix% And bit Then Inc cs$,m$(n)+" "
-  Next
-  Contr_input$=cs$
+
+
+Function read_gamemite$()
+  Local bits% = Inv Port(Gp8, 8) And &hFF, s$
+
+  Select Case bits%
+    Case 0    : Exit Function
+    Case &h01 : s$ = "down"
+    Case &h02 : s$ = "left"
+    Case &h04 : s$ = "up"
+    Case &h08 : s$ = "right"
+    Case &h10 : s$ = "escape"        ' Select
+    Case &h20 : s$ = "use-item"      ' Start
+    Case &h40 : s$ = "search"        ' Fire B
+    Case &h41 : s$ = "toggle-item"   ' Down + Fire B
+    Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
+    Case &h80 : s$ = "move"          ' Fire A
+    Case &h81 : s$ = "fire-down"     ' Down + Fire A
+    Case &h82 : s$ = "fire-left"     ' Left + Fire A
+    Case &h84 : s$ = "fire-up"       ' Up + Fire A
+    Case &h88 : s$ = "fire-right"    ' Right + Fire A
+    Case &hC0 : s$ = "map"           ' Fire A + Fire B
+  End Select
+
+  read_gamemite$ = s$
 End Function
-  
-  
-  'This is for serial 74HC4021 in a NES controller on PicoGameVGA
-Function nes_input$()
-  Local m$(7)=("BUT-A","BUT-B","SELECT","START","UP","DOWN","LEFT","RIGHT"),bit
+
+
+'This is for serial 74HC4021 in a NES controller on PicoGameVGA
+Function read_nes$()
+  Local bits%, i%, s$
+
   Pulse a_latch, pulse_len!
-  out=0:cs$=""
-  For i=0 To 7
-    If Not Pin(a_dat) Then out=out Or 2^i
+  For i% = 0 To 7
+    If Not Pin(a_dat) Then bits%=bits% Or 2^i%
     Pulse a_clk, pulse_len!
   Next
-  For n=0 To 7
-    bit=2^n:If out And bit Then Inc cs$,m$(n)+" "
-  Next
-  nes_input$=cs$
+
+  Select Case bits%
+    Case 0    : Exit Function
+    Case &h01 : s$ = "move"          ' Fire A
+    Case &h02 : s$ = "search"        ' Fire B
+    Case &h03 : s$ = "map"           ' Fire A + Fire B
+    Case &h04 : s$ = "escape"        ' Select
+    Case &h08 : s$ = "use-item"      ' Start
+    Case &h10 : s$ = "up"
+    Case &h11 : s$ = "fire-up"       ' Up + Fire A
+    Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
+    Case &h20 : s$ = "down"
+    Case &h21 : s$ = "fire-down"     ' Down + Fire A
+    Case &h22 : s$ = "toggle-item"   ' Down + Fire B
+    Case &h40 : s$ = "left"
+    Case &h41 : s$ = "fire-left"     ' Left + Fire A
+    Case &h80 : s$ = "right"
+    Case &h81 : s$ = "fire-right"    ' Right + Fire A
+  End Select
+
+  read_nes$ = s$
 End Function
-  
-  
-  'Controller to Keyboard translation
-Function c2k$()
-  Local c$,tmp$
-  If nesPG1 Then
-    c$=nes_input$()
-  Else
-    c$=contr_input$()
-  EndIf
-  If c$<>"" Then
-    Select Case c$
-        Case "DOWN "       : c2k$=Chr$(129)'down
-        Case "UP "         : c2k$=Chr$(128)'up
-        Case "LEFT "       : c2k$=Chr$(130)'left
-        Case "RIGHT "      : c2k$=Chr$(131)'right
-        Case "BUT-A "      : c2k$="m"      'A
-        Case "BUT-B "      : c2k$="z"      'B
-        Case "START "      : c2k$=" "      'Start
-        Case "BUT-B BUT-A ","BUT-A BUT-B ": c2k$=Chr$(9)  'Tab
-        Case "DOWN BUT-A " ,"BUT-A DOWN " : c2k$="s"      'Fire Down
-        Case "UP BUT-A "   ,"BUT-A UP "   : c2k$="w"      'Fire Up
-        Case "LEFT BUT-A " ,"BUT-A LEFT " : c2k$="a"      'Fire Left
-        Case "RIGHT BUT-A ","BUT-A RIGHT ": c2k$="d"      'Fire Right
-        Case "UP BUT-B "   ,"BUT-B UP "   : c2k$=Chr$(145)'F1
-        Case "DOWN BUT-B " ,"BUT-B DOWN " : c2k$=Chr$(146)'F2
-        Case "SELECT "     : c2k$=Chr$(27) 'ESC
-    End Select
-  EndIf
-End Function
+
 
 ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
