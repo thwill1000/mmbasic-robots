@@ -3,23 +3,18 @@
   Option Default Integer
 
   ' system setup -----------------------------------------------------
-
-  Const Game_Mite=1-(MM.Device$="PicoMiteVGA")
-  Dim read_ctrl$ = ""
-
-  If Game_Mite Then
-    read_ctrl$ = "read_gamemite$"
-    sc$="f":init_game_ctrl ' Init Controller on Game*Mite
-  Else
-    sc$="n":MODE 2
-  EndIf
-
-  ' Uncomment to use NES controller on PicoGAME VGA port A
-  ' read_ctrl$ = "read_nes$"
   
+  Const NES_A_DATA = Mm.Info(PinNo GP1)
+  Const NES_A_LATCH = Mm.Info(PinNo GP2)
+  Const NES_A_CLOCK = Mm.Info(PinNo GP3)
+  Const NES_PULSE! = 0.012 ' 12uS
+
+  Const LCD_DISPLAY = Mm.Device$ = "PicoMite"
+  Const CTRL_DRIVER$ = init_controller$()
+  Const SC$ = Choice(LCD_DISPLAY, "f", "n")
   
   'screen setup
-  If Game_Mite Then FRAMEBUFFER Create 'f
+  If LCD_DISPLAY Then FRAMEBUFFER Create Else Mode 2
   FRAMEBUFFER layer 9 'color 9 is transparant
   Font 9
   
@@ -73,7 +68,7 @@
   'write frame around playfield
   FRAMEBUFFER Write sc$
   Load image path$("images/layer_b.bmp")  'the actual frame
-  If Game_Mite Then FRAMEBUFFER Merge 9
+  If LCD_DISPLAY Then FrameBuffer Merge 9
   
   'start music/sfx modfile
   music=1
@@ -247,7 +242,7 @@
         ani_tiles                           'change the animated Tiles
         
         'write UNITS from UNIT ATTRIB array to layer L
-        if Game_Mite=0 then framebuffer wait
+        If Not LCD_DISPLAY Then FrameBuffer Wait
         writesprites_l
         
       Else
@@ -267,12 +262,12 @@
       If k$ <> "escape" Then k$="" : writecomment("continue") 'any value that does not quit
     end if
     
-    If Game_Mite Then FRAMEBUFFER merge 9,b
+    If LCD_DISPLAY Then FrameBuffer Merge 9,b
     
   Loop Until k$ = "escape"   'quit when <esc> is pressed
   
   game_end
-  if Game_Mite then framebuffer copy f,n
+  If LCD_DISPLAY Then FrameBuffer Copy f,n
   
   pause 5000:play stop:run
   
@@ -1849,19 +1844,20 @@ Sub show_intro
   'sl=1 'set menu slot to top
   '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
-  MSG$=String$(36,32)
-  MSG$=MSG$+"original Game by David Murray - "
-  MSG$=MSG$+"Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
-  MSG$=MSG$+"Community - Music by Noelle Aman, Graphic by "
-  MSG$=MSG$+"Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
+  Local msg$ = String$(36,32)
+  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
+  Cat msg$, "Original Game by David Murray - "
+  Cat msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
+  Cat msg$, "Community - Music by Noelle Aman, Graphic by "
+  Cat msg$, "Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
   flip=0
   MT=0
   
   'check player choice
   kill_kb
   Do
-    If flip=0 Then Inc MT:If mt>Len(MSG$) Then MT=0
-    tp$=Mid$(MSG$,1+MT,41)
+    If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
+    tp$=Mid$(msg$,1+MT,41)
     if t2=0 then 'once every 4 cycles
       k$=read_input$()
       If k$<>"" Then
@@ -1888,7 +1884,7 @@ Sub show_intro
                   EndIf
                   Text 9,70,"                "
                   Text 9,70,UCase$(map_nam$(Map_Nr))
-                  If Game_Mite Then FRAMEBUFFER merge 9,b
+                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
                 EndIf
                 Pause 200
               Loop
@@ -1914,7 +1910,7 @@ Sub show_intro
                   EndIf
                   Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
                   Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
-                  If Game_Mite Then FRAMEBUFFER Merge 9,b
+                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
                 EndIf
                 Pause 200
               Loop
@@ -1931,7 +1927,7 @@ Sub show_intro
     Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) and 3
     Inc t: t=t Mod 12 'color change
     inc t2: t2=t2 mod 3 'reponse time keys
-    If Game_Mite Then FRAMEBUFFER Merge 9,b
+    If LCD_DISPLAY Then FrameBuffer Merge 9,b
     Pause 50
   Loop
   Play stop
@@ -1963,8 +1959,8 @@ Sub fade_in
   For n=0 To 7
     For x=n To 320 Step 8:Line x,0,x,240,,col(5):Next
     For y=n To 240 Step 8:Line 0,y,320,y,,col(5):Next
-    If Game_Mite Then FRAMEBUFFER merge 9,b
-    Pause 50+130*Game_Mite
+    If LCD_DISPLAY Then FrameBuffer Merge 9,b
+    Pause 50+130*LCD_DISPLAY
   Next
 End Sub
   
@@ -1974,15 +1970,15 @@ Sub fade_out
   For n=0 To 7
     For x=n To 320 Step 8:Line x,0,x,240,,0:Next
     For y=n To 240 Step 8:Line 0,y,320,y,,0:Next
-    If Game_Mite Then FRAMEBUFFER merge 9,b
-    Pause 50+130*Game_Mite
+    If LCD_DISPLAY Then FrameBuffer Merge 9,b
+    Pause 50+130*LCD_DISPLAY
   Next
 End Sub
 
 Function read_input$()
   read_input$ = read_inkey$()
   If Len(read_input$) Then Exit Function
-  read_input$ = Call(read_ctrl$)
+  read_input$ = Call(CTRL_DRIVER$)
 End Function
 
 Function read_inkey$()
@@ -2010,95 +2006,186 @@ Function read_inkey$()
 End Function
 
   '---joystick/Gamepad specific settings
-  
-  'settings for NES on PicoGameVGA platform port A
-sub config_nes
-  DIM a_dat=2   'GP1
-  DIM a_latch=4 'GP2
-  DIM a_clk=5   'GP3
-  DIM pulse_len!=0.012 '12uS
-  SetPin a_dat, din
-  SetPin a_latch, dout
-  SetPin a_clk, dout
-  setpin gp14,dout:pin(gp14)=1 'power for the NES controller
-end sub
-  
-  
-  'Settings for Game*Mite
-Sub init_game_ctrl
-  Local i%
-  ' Initialise GP8-GP15 as digital inputs with PullUp resistors
-  For i% = 8 To 15
-    SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
-  Next
-End Sub
 
 
-Function read_gamemite$()
-  Local bits% = Inv Port(Gp8, 8) And &hFF, s$
-
-  Select Case bits%
-    Case 0    : Exit Function
-    Case &h01 : s$ = "down"
-    Case &h02 : s$ = "left"
-    Case &h04 : s$ = "up"
-    Case &h08 : s$ = "right"
-    Case &h10 : s$ = "escape"        ' Select
-    Case &h20 : s$ = "use-item"      ' Start
-    Case &h40 : s$ = "search"        ' Fire B
-    Case &h41 : s$ = "toggle-item"   ' Down + Fire B
-    Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
-    Case &h80 : s$ = "move"          ' Fire A
-    Case &h81 : s$ = "fire-down"     ' Down + Fire A
-    Case &h82 : s$ = "fire-left"     ' Left + Fire A
-    Case &h84 : s$ = "fire-up"       ' Up + Fire A
-    Case &h88 : s$ = "fire-right"    ' Right + Fire A
-    Case &hC0 : s$ = "map"           ' Fire A + Fire B
+Function init_controller$()
+  Select Case sys.get_config$("device", Mm.Device$)
+    Case "PicoMite", "PicoMiteVGA"
+      init_controller$ = "ctrl_none$"
+    Case "Game*Mite"
+      init_controller$ = "ctrl_gamemite$"
+    Case "PicoGAME VGA"
+      Select Case LCase$(sys.get_config$("default-controller", "nes_a"))
+        Case "none", ""
+          init_controller$ = "ctrl_none$"
+        Case "nes_a", "nes-a"
+          init_controller$ = "ctrl_nes_a$"
+        Case "atari_a", "atari-a"
+          init_controller$ = "ctrl_atari_a$"
+        Case Else
+          Error "Unsupported default controller: " + sys.get_config$("default-controller", "nes_a")
+      End Select
+    Case Else
+      Error "Unsupported device: " + sys.get_config$("device", Mm.Device$)
   End Select
-
-  read_gamemite$ = s$
+  Local s$ = Call(init_controller$, 1)
 End Function
 
 
-'This is for serial 74HC4021 in a NES controller on PicoGameVGA
-Function read_nes$()
-  Local bits%, i%, s$
+' Dummy controller driver.
+Function ctrl_none$(init%)
+End Function
 
-  Pulse a_latch, pulse_len!
-  For i% = 0 To 7
-    If Not Pin(a_dat) Then bits%=bits% Or 2^i%
-    Pulse a_clk, pulse_len!
-  Next
 
-  Select Case bits%
-    Case 0    : Exit Function
-    Case &h01 : s$ = "move"          ' Fire A
-    Case &h02 : s$ = "search"        ' Fire B
-    Case &h03 : s$ = "map"           ' Fire A + Fire B
-    Case &h04 : s$ = "escape"        ' Select
-    Case &h08 : s$ = "use-item"      ' Start
-    Case &h10 : s$ = "up"
-    Case &h11 : s$ = "fire-up"       ' Up + Fire A
-    Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
-    Case &h20 : s$ = "down"
-    Case &h21 : s$ = "fire-down"     ' Down + Fire A
-    Case &h22 : s$ = "toggle-item"   ' Down + Fire B
-    Case &h40 : s$ = "left"
-    Case &h41 : s$ = "fire-left"     ' Left + Fire A
-    Case &h80 : s$ = "right"
-    Case &h81 : s$ = "fire-right"    ' Right + Fire A
-  End Select
+' Controller driver for Game*Mite.
+Function ctrl_gamemite$(init%)
+  If Not init% Then
+    Local bits% = Inv Port(GP8, 8) And &hFF, s$
 
-  read_nes$ = s$
+    Select Case bits%
+      Case 0    : Exit Function
+      Case &h01 : s$ = "down"
+      Case &h02 : s$ = "left"
+      Case &h04 : s$ = "up"
+      Case &h08 : s$ = "right"
+      Case &h10 : s$ = "escape"        ' Select
+      Case &h20 : s$ = "use-item"      ' Start
+      Case &h40 : s$ = "search"        ' Fire B
+      Case &h41 : s$ = "toggle-item"   ' Down + Fire B
+      Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
+      Case &h80 : s$ = "move"          ' Fire A
+      Case &h81 : s$ = "fire-down"     ' Down + Fire A
+      Case &h82 : s$ = "fire-left"     ' Left + Fire A
+      Case &h84 : s$ = "fire-up"       ' Up + Fire A
+      Case &h88 : s$ = "fire-right"    ' Right + Fire A
+      Case &hC0 : s$ = "map"           ' Fire A + Fire B
+    End Select
+
+    ctrl_gamemite$ = s$
+    Exit Function
+  Else
+    ' Initialise GP8-GP15 as digital inputs with PullUp resistors
+    Local i%
+    For i% = 8 To 15
+      SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
+    Next
+  EndIf
+End Function
+
+
+' Controller driver for NES gamepad connected to PicoGAME VGA port A.
+Function ctrl_nes_a$(init%)
+  If Not init% Then
+    Local bits%, i%, s$
+
+    Pulse NES_A_LATCH, NES_PULSE!
+    For i% = 0 To 7
+      If Not Pin(NES_A_DATA) Then bits%=bits% Or 2^i%
+      Pulse NES_A_CLOCK, NES_PULSE!
+    Next
+
+    Select Case bits%
+      Case 0    : Exit Function
+      Case &h01 : s$ = "move"          ' Fire A
+      Case &h02 : s$ = "search"        ' Fire B
+      Case &h03 : s$ = "map"           ' Fire A + Fire B
+      Case &h04 : s$ = "escape"        ' Select
+      Case &h08 : s$ = "use-item"      ' Start
+      Case &h10 : s$ = "up"
+      Case &h11 : s$ = "fire-up"       ' Up + Fire A
+      Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
+      Case &h20 : s$ = "down"
+      Case &h21 : s$ = "fire-down"     ' Down + Fire A
+      Case &h22 : s$ = "toggle-item"   ' Down + Fire B
+      Case &h40 : s$ = "left"
+      Case &h41 : s$ = "fire-left"     ' Left + Fire A
+      Case &h80 : s$ = "right"
+      Case &h81 : s$ = "fire-right"    ' Right + Fire A
+    End Select
+
+    ctrl_nes_a$ = s$
+    Exit Function
+  Else
+    SetPin NES_A_DATA, DIn
+    SetPin NES_A_LATCH, DOut
+    SetPin NES_A_CLOCK, DOut
+    SetPin GP14, DOut
+    Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
+  EndIf
+End Function
+
+
+' Controller driver for Atari joystick connected to PicoGAME VGA port A.
+Function ctrl_atari_a$(init%)
+  If Not init% Then
+    Local bits%, s$
+    Inc bits%, Not Pin(GP14)       ' Fire
+    Inc bits%, Not Pin(GP0) * &h02 ' Up
+    Inc bits%, Not Pin(GP1) * &h04 ' Down
+    Inc bits%, Not Pin(GP2) * &h08 ' Left
+    Inc bits%, Not Pin(GP3) * &h10 ' Right
+
+    Select Case bits%
+      Case 0    : Exit Function
+      Case &h02 : s$ = "up"
+      Case &h03 : s$ = "fire-up"
+      Case &h04 : s$ = "down"
+      Case &h05 : s$ = "fire-down"
+      Case &h08 : s$ = "left"
+      Case &h09 : s$ = "fire-left"
+      Case &h10 : s$ = "right"
+      Case &h11 : s$ = "fire-right"
+    End Select
+
+    ctrl_atari_a$ = s$
+    Exit Function
+  Else
+    SetPin GP0, DIn : SetPin GP1, DIn : SetPin GP2, DIn : SetPin GP3, DIn : SetPin GP14, DIn
+  EndIf
 End Function
 
 
 ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
-  path$ = Choice(Mm.Info(Path) <> "", Mm.Info(Path), Cwd$)
+  Select Case Mm.Info(Path)
+    Case "", "NONE" : path$ = Cwd$
+    Case Else: path$ = Mm.Info(Path)
+  End Select
   If Len(f$) Then Cat path$, "/" + f$
 End Function
-  
+
+
+' Reads property from config (.ini) file.
+'
+' @param  key$      case-insensitive key for property to lookup.
+' @param  default$  value to return if property or file is not present.
+' @param  file$     file to read. If empty then read "A:/.spconfig", or
+'                   if that is not present "A:/.config".
+Function sys.get_config$(key$, default$, file$)
+  sys.get_config$ = default$
+  If file$ = "" Then
+    Const file_$ = Choice(Mm.Info(Exists File "A:/.spconfig"), "A:/.spconfig", "A:/.config")
+  Else
+    Const file_$ = file$
+  EndIf
+  If Not Mm.Info(Exists File file_$) Then Exit Function
+
+  Local key_$ = LCase$(key$), s$, v$
+  Open file_$ For Input As #1
+  Do While Not Eof(#1)
+    Line Input #1, s$
+    If LCase$(Field$(Field$(s$, 1, "=", Chr$(34)),1, "#;", Chr$(34))) = key_$ Then
+      v$ = Field$(Field$(s$, 2, "=", Chr$(34)), 1, "#;", Chr$(34))
+      If Left$(v$, 1) = Chr$(34) Then v$ = Mid$(v$, 2)
+      If Right$(v$, 1) = Chr$(34) Then v$ = Mid$(v$, 1, Len(v$) - 1)
+      sys.get_config$ = v$
+      Exit Do
+    EndIf
+  Loop
+  Close #1
+End Function
+
+
 colors:
   '--Colorscheme accordung to Spritecolors
   Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
