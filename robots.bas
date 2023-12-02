@@ -1,14 +1,14 @@
   'petrobot testbed picomite VGA V50708RC17 or later
-
-  Option Default Integer
-
+  
+  Option default Integer
+  
   ' system setup -----------------------------------------------------
   
   Const NES_A_DATA = Mm.Info(PinNo GP1)
   Const NES_A_LATCH = Mm.Info(PinNo GP2)
   Const NES_A_CLOCK = Mm.Info(PinNo GP3)
   Const NES_PULSE! = 0.012 ' 12uS
-
+  
   Const LCD_DISPLAY = Mm.Device$ = "PicoMite"
   Const CTRL_DRIVER$ = init_controller$()
   Const SC$ = Choice(LCD_DISPLAY, "f", "n")
@@ -78,6 +78,7 @@
   'write initial world
   map_mode=0              'overview world map off
   writeworld_n(xm,ym)     'initialwold
+  framebuffer write L:fade_in:framebuffer write sc$
   ani_timer=1             'world animations
   
   'game play variables
@@ -172,14 +173,14 @@
           pl_it=(pl_it+1) Mod 5
           show_item
           Play modsample s_cycle_item,4
-          'Case 147 'F3 cheat key as long as you are alive
-          'if UH(0)>0 then
-          'UH(0)=12                      'full life
-          'pl_ky=7:show_keys             'all keys
-          'pl_pa(1)=100:pl_pa(2)=100     'much ammo
-          'pl_bo=100:pl_em=100:pl_ma=100 'all items
-          'pl_mk=100                     'full medkit
-          'end if
+        Case "cheat" 'F3 cheat key as long as you are alive
+          if UH(0)>0 then
+            UH(0)=12                      'full life
+            pl_ky=7:show_keys             'all keys
+            pl_pa(1)=100:pl_pa(2)=100     'much ammo
+            pl_bo=100:pl_em=100:pl_ma=100 'all items
+            pl_mk=100                     'full medkit
+          end if
         Case "map" 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
@@ -375,7 +376,7 @@ Sub writesprites_l
             If UB(i)>0 Then Sprite memory sprite_index(UA(i)),xs+24*dx,ys+24*dy,9
           case 73 'emp
             if UB(i)<2 then box 0,24,11*24,7*24,,rgb(lilac),rgb(lilac)
-          Case 74
+          Case 74 'canister or plasma
             show_explosion(UA(i),dx,dy,UC(i)) 'explosions in radius < UC
         end select
       end if
@@ -383,7 +384,7 @@ Sub writesprites_l
   next
   For i=32 To 47
     if UT(i)=19 then
-      if UX(i)=UX(0) and UY(i)=UY(0)+1 then 'elevator
+      if UX(i)=UX(0) And UY(i)=UY(0)+1 then 'elevator
         ele_level(pl_el)
       end if
     end if
@@ -631,7 +632,7 @@ sub crush(i,x,y)
     if UB(i)=2 then anim_tc(x,y,&h98,&h99,&h9C,&h9D):UB(i)=3
     if UB(i)=1 then anim_tc(x,y,&h92,&h93,&h96,&h97):UB(i)=2
   end if
-  if UB(i)=0 and UH(0)=0 then game_over
+  if UB(i)=0 And UH(0)=0 then game_over
 end sub
   
   
@@ -852,7 +853,7 @@ Sub AI_units
       Case 71 'bomb
         Inc UB(i),-1
         If UB(i)=0 Then
-          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),UD(i),1) 'do damage UD in radius < UC
           UA(i)=247 'explosion tile
           Play modsample s_dsbarexp,4
         EndIf
@@ -866,12 +867,12 @@ Sub AI_units
         If UB(i)<0 Then
           UT(i)=0 'free slot
         Else
-          if dx=0 and dy=0 then 'pick up magnet
+          if dx=0 And dy=0 then 'pick up magnet
             UT(i)=0:inc pl_ma,1:show_item
           else
             'check for robot contact with magnet
             j=has_unit(UX(i),UY(i))
-            if j>0 and j<255 then 'mark robot
+            if j>0 And j<255 then 'mark robot
               UT(i)=0:UC(j)=2 'magnet used, bot move direction random
               play modsample s_magnet2,4
             end if
@@ -896,9 +897,9 @@ Sub AI_units
           em_on=0:UT(i)=0 'remove from list
         end if
         inc UB(i),1
-      Case 74 'canister blow
+      Case 74 'canister blow or plasma blow
         if UA(i)=247 then 'only once...
-          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),UD(i),0) 'do damage UD in radius < UC
           Play modsample s_dsbarexp,4
         end if
         Inc UA(i),1  'next tile in explosion sequence
@@ -911,12 +912,12 @@ Sub AI_units
     nearx=Abs(dx):neary=Abs(dy)
     Select Case UT(i)
       Case 7 'transporter
-        UB(i)=UB(i)+1 and 3 'UB=delay counter
+        UB(i)=UB(i)+1 And 3 'UB=delay counter
         if UB(i)=0 then
           if UA(i)=0 then 'transporter active
             UH(i)=&h1E+(UH(i)=&h1E) 'UH=tile toggle between &h1E and &h1F
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
-            if dx=0 and dy=0 then
+            if dx=0 And dy=0 then
               if UC(i)=0 then
                 k$ = "escape" 'force game over by simulate pressing ESC
               else
@@ -928,7 +929,7 @@ Sub AI_units
           end if
         end if
       Case 10 'automatic doors
-        If nearx<2 And neary<2 and UD(i)=0 Then   'operate door
+        If nearx<2 And neary<2 And UD(i)=0 Then   'operate door
           If UC(i)=0 Then
             open_door(i,UX(i),UY(i))
           ElseIf (2^(UC(i)-1) And pl_ky) Then 'bugfix untested
@@ -964,7 +965,7 @@ Sub AI_units
             close_elev(i,UX(i),UY(i))
           end if
           if dy=1 then
-            if pl_md=p_w and UB(i)=5 then
+            if pl_md=p_w And UB(i)=5 then
               pl_md=p_ele1 'you are inside elevator door closed
               pl_el=UC(i)
               ele_instructions(i)
@@ -993,7 +994,7 @@ Sub AI_units
             INC UX(i),-1:IF UX(i)=UB(i) then UA(i)=1:UD(i)=16
           end if
           MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(&hF2) 'new is raft tile
-          if dx=0 and dy=0 then xp=UX(i) 'if we are on the raft, stay on it
+          if dx=0 And dy=0 then xp=UX(i) 'if we are on the raft, stay on it
         end if
         inc UD(i),-1 'timer
     End Select
@@ -1026,7 +1027,7 @@ Sub agro_bot(i,dx,dy,hov)
     If (get_ta(UX(i),yp+y) And (b_wlk+hov)) Then UY(i)=yp+y
   end if
   
-  p=(p+1) and 3
+  p=(p+1) And 3
   if hov=0 then 'evilbot
     UA(i)=d+p 'animated sprites for drawing
   else 'agro hoverbot
@@ -1072,7 +1073,7 @@ End Sub
   
   
 sub dazzle_bot(i)
-  UD(i)=(UD(i)+1) and 3 'walking speed
+  UD(i)=(UD(i)+1) And 3 'walking speed
   if UD(i)=0 then
     local r=int(rnd()*5),xy
     inc UC(i),1 'time count 3,4...
@@ -1198,9 +1199,9 @@ Sub bot_shoot_v(i,dy)
 End Sub
   
   
-  'applies damage to all units and objects in a radius
-Sub do_damage(x,y,r,d)
-  Local i,j,a,rr
+  'applies d damage to all units and objects in a radius
+Sub do_damage(x,y,r,d,s)
+  Local i,j,a,rr,t$
   
   For i=0 To 27 'all units
     If Abs(UX(i)-x)<r then
@@ -1214,23 +1215,27 @@ Sub do_damage(x,y,r,d)
     endif
   Next
   
+  'depending the source s result of an explosion differs
   rr=r-1 'tiles only inside radius
   For i=-rr To rr
     For j=-rr To rr
       a=Asc(Mid$(lv$(y+j),x+i+1,1))
       Select Case a
         Case &h83
-          MID$(lv$(y+j),x+i+1,1)=Chr$(&h87) 'canister
-          If i<>0 Or j<>0 Then blow_canister(x+i,y+j) 'not yourself
-          'blow_canister(x+i,y+j)
-        Case &h29
-          MID$(lv$(y+j),x+i+1,1)=Chr$(&h2A) 'carton box
-        Case &hC7
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&hC6) 'wooden box
-        Case &h2D
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&h2E) 'small box
+          MID$(lv$(y+j),i+x+1,1)=Chr$(&h87) 'canister blown
+          If i<>0 Or j<>0 Then blow_canister(x+i,y+j) 'not itself
+        Case &h29,&h2A
+          if s=0 then t$=Chr$(&h2A) else t$=chr$(9) 'carton box
+          MID$(lv$(y+j),i+x+1,1)=t$
+        Case &hC7,&hC6
+          if s=0 then t$=Chr$(&hC6) else t$=chr$(9) 'wooden box
+          MID$(lv$(y+j),i+x+1,1)=t$
+        Case &h2D,&h2E
+          if s=0 then t$=Chr$(&h2E) else t$=chr$(9) 'small box
+          MID$(lv$(y+j),i+x+1,1)=t$
         Case &hCD
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&hCC) 'bridge
+          if s=0 then t$=Chr$(&hCC) else t$=chr$(9) 'bridge
+          MID$(lv$(y+j),i+x+1,1)=t$
         case &h18
           MID$(lv$(y+j),i+x+1,1)=Chr$(9) 'plant
       End Select
@@ -1344,14 +1349,16 @@ Sub fire_ew(p)
   'UA() is the fire line sprite
   If pl_pa(pl_wp)>0 Then
     
-    Local x=0,i,j,b=0,d=0,t
+    Local x=0,i,j,b=0,d=0,t,xip,typ
     
     i=findslot()      'find a weapon slot in UNIT array
     If i<32 Then
       
       UT(i)=127:UX(i)=xp:UY(i)=yp 'default claim array slot
       Do
-        Inc x,p:t=get_ta(xp+x,yp):UX(i)=xp+x 'next tile n/s
+        Inc x,p:xip=xp+x
+        t=get_ta(xip,yp):UX(i)=xip      'next tile n/s
+        typ=Asc(Mid$(lv$(yp),xip+1,1))
         
         j=has_unit(UX(i),UY(i))
         If j<255 Then' if robot then damage it
@@ -1362,17 +1369,17 @@ Sub fire_ew(p)
           
         ElseIf (t And (b_wlk+b_hov)) Then   'pass fire, next tile
           
-        ElseIf Asc(Mid$(lv$(yp),xp+x+1,1))=&h83 Then 'canister
-          blow_canister(xp+x,yp)
+        ElseIf typ=&h83 Then 'canister
+          blow_canister(xip,yp)
           Inc x,-p:Exit
           
-        ElseIf (t And (b_see))=0 Then  'stopped by wall or plant
+        ElseIf (t And (b_see))=0 or typ=&h18 Then  'stopped by wall or plant
           explosion(i)
           Inc x,-p:Exit
-          
+
         EndIf
         
-      Loop Until Abs(x)=xm
+      Loop Until Abs(x)=xm        
       
       'register for screen
       If Abs(x)>=1 Then
@@ -1402,7 +1409,7 @@ Sub fire_ns(p)
   'UA() is the sprite
   If pl_pa(pl_wp)>0 Then
     
-    Local y=0,i,j,b=0,d=0,t
+    Local y=0,i,j,b=0,d=0,t,yip,typ
     
     i=findslot()      'find a weapon slot in UNIT array
     If i<32 Then
@@ -1410,7 +1417,9 @@ Sub fire_ns(p)
       UT(i)=127:UX(i)=xp:UY(i)=yp   'default claim array slot
       Do
         
-        Inc y,p:t=get_ta(xp,yp+y):UY(i)=yp+y 'next tile n/s
+        Inc y,p:yip=yp+y
+        t=get_ta(xp,yip):UY(i)=yip 'next tile n/s
+        typ=Asc(Mid$(lv$(yp+y),xp+1,1))
         
         j=has_unit(UX(i),UY(i))
         If j<255 Then 'if robot then damage it
@@ -1421,18 +1430,18 @@ Sub fire_ns(p)
           
         ElseIf (t And (b_wlk+b_hov)) Then   'pass fire, next tile
           
-        ElseIf Asc(Mid$(lv$(yp+y),xp+1,1))=&h83 Then 'canister
-          blow_canister(xp,yp+y)
+        ElseIf typ=&h83 Then 'canister
+          blow_canister(xp,yip)
           Inc y,-p:Exit
           
-        ElseIf (t And (b_see))=0 Then  'stopped by wall or plant
+        ElseIf (t And (b_see))=0 or typ=&h18 Then  'stopped by wall
           explosion(i)
           Inc y,-p:Exit
           
         EndIf
-        
+
       Loop Until Abs(y)=ym
-      
+    
       'register for screen
       If Abs(y)>=1 Then
         UT(i)=12+(y>0):UC(i)=y:UA(i)=248-4*pl_wp
@@ -1573,9 +1582,9 @@ Sub use_item
         end if
       end if
     Case 3 'magnet
-      pl_md=p_mg1
+      if pl_ma>0 then pl_md=p_mg1
     Case 4 'bomb
-      pl_md=p_bo1
+      if pl_bo>0 then pl_md=p_bo1
   End Select
   show_item
 End Sub
@@ -1601,7 +1610,7 @@ end sub
 sub next_floor(h)
   local i
   for i=32 to 47 'range where elevators live
-    if UT(i)=19 and UC(i)=pl_el+h then
+    if UT(i)=19 And UC(i)=pl_el+h then
       xp=UX(i):yp=UY(i)-1:pl_el=pl_el+h 'go inside this elevator
       UX(0)=xp:UY(0)=yp
       exit for 'found new floor
@@ -1788,7 +1797,7 @@ Sub loadgraphics
   'read index file. the order must not be changed
   Open path$("lib/flash_index.txt") For input As #1
   
-  For i=0 To &hff
+  For i=0 To &hFF
     Input #1,a$:tile_index(i)=Val(a$)+fl_adr
   Next
   
@@ -1841,11 +1850,11 @@ Sub show_intro
   
   'Display Map Name
   Text 9,70,UCase$(map_nam$(Map_Nr))
-  'sl=1 'set menu slot to top
-  '--- copyright notices etc
+
+'--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
   Local msg$ = String$(36,32)
-  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
+'  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
   Cat msg$, "Original Game by David Murray - "
   Cat msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
   Cat msg$, "Community - Music by Noelle Aman, Graphic by "
@@ -1924,7 +1933,7 @@ Sub show_intro
     
     show_menu MS,col(puls(t))
     
-    Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) and 3
+    Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) And 3
     Inc t: t=t Mod 12 'color change
     inc t2: t2=t2 mod 3 'reponse time keys
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
@@ -1974,40 +1983,40 @@ Sub fade_out
     Pause 50+130*LCD_DISPLAY
   Next
 End Sub
-
+  
 Function read_input$()
   read_input$ = read_inkey$()
   If Len(read_input$) Then Exit Function
   read_input$ = Call(CTRL_DRIVER$)
 End Function
-
+  
 Function read_inkey$()
   Select Case Asc(Inkey$)
-    Case 0   : Exit Function
-    Case 9   : read_inkey$ = "map"          ' Tab
-    Case 27  : read_inkey$ = "escape"
-    Case 32  : read_inkey$ = "use-item"     ' Space
-    Case 77  : read_inkey$ = "toggle-music" ' M
-    Case 97  : read_inkey$ = "fire-left"    ' a
-    Case 100 : read_inkey$ = "fire-right"   ' d
-    Case 109 : read_inkey$ = "move"         ' m
-    Case 115 : read_inkey$ = "fire-down"    ' s
-    Case 119 : read_inkey$ = "fire-up"      ' w
-    Case 121, 122 : read_inkey$ = "search"  ' y, z
-    Case 128 : read_inkey$ = "up"
-    Case 129 : read_inkey$ = "down"
-    Case 130 : read_inkey$ = "left"
-    Case 131 : read_inkey$ = "right"
-    Case 145 : read_inkey$ = "toggle-weapon" ' F1
-    Case 146 : read_inkey$ = "toggle-item"   ' F2
-    Case 147 : read_inkey$ = "cheat"         ' F3
-    Case 148 : read_inkey$ = "kill-all"      ' F4
+      Case 0   : Exit Function
+      Case 9   : read_inkey$ = "map"          ' Tab
+      Case 27  : read_inkey$ = "escape"
+      Case 32  : read_inkey$ = "use-item"     ' Space
+      Case 77  : read_inkey$ = "toggle-music" ' M
+      Case 97  : read_inkey$ = "fire-left"    ' a
+      Case 100 : read_inkey$ = "fire-right"   ' d
+      Case 109 : read_inkey$ = "move"         ' m
+      Case 115 : read_inkey$ = "fire-down"    ' s
+      Case 119 : read_inkey$ = "fire-up"      ' w
+      Case 121, 122 : read_inkey$ = "search"  ' y, z
+      Case 128 : read_inkey$ = "up"
+      Case 129 : read_inkey$ = "down"
+      Case 130 : read_inkey$ = "left"
+      Case 131 : read_inkey$ = "right"
+      Case 145 : read_inkey$ = "toggle-weapon" ' F1
+      Case 146 : read_inkey$ = "toggle-item"   ' F2
+      Case 147 : read_inkey$ = "cheat"         ' F3
+      Case 148 : read_inkey$ = "kill-all"      ' F4
   End Select
 End Function
-
+  
   '---joystick/Gamepad specific settings
-
-
+  
+  
 Function init_controller$()
   Select Case sys.get_config$("device", Mm.Device$)
     Case "PicoMite", "PicoMiteVGA"
@@ -2030,37 +2039,37 @@ Function init_controller$()
   End Select
   Local s$ = Call(init_controller$, 1)
 End Function
-
-
-' Dummy controller driver.
+  
+  
+  ' Dummy controller driver.
 Function ctrl_none$(init%)
 End Function
-
-
-' Controller driver for Game*Mite.
+  
+  
+  ' Controller driver for Game*Mite.
 Function ctrl_gamemite$(init%)
   If Not init% Then
     Local bits% = Inv Port(GP8, 8) And &hFF, s$
-
+    
     Select Case bits%
-      Case 0    : Exit Function
-      Case &h01 : s$ = "down"
-      Case &h02 : s$ = "left"
-      Case &h04 : s$ = "up"
-      Case &h08 : s$ = "right"
-      Case &h10 : s$ = "escape"        ' Select
-      Case &h20 : s$ = "use-item"      ' Start
-      Case &h40 : s$ = "search"        ' Fire B
-      Case &h41 : s$ = "toggle-item"   ' Down + Fire B
-      Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
-      Case &h80 : s$ = "move"          ' Fire A
-      Case &h81 : s$ = "fire-down"     ' Down + Fire A
-      Case &h82 : s$ = "fire-left"     ' Left + Fire A
-      Case &h84 : s$ = "fire-up"       ' Up + Fire A
-      Case &h88 : s$ = "fire-right"    ' Right + Fire A
-      Case &hC0 : s$ = "map"           ' Fire A + Fire B
+        Case 0    : Exit Function
+        Case &h01 : s$ = "down"
+        Case &h02 : s$ = "left"
+        Case &h04 : s$ = "up"
+        Case &h08 : s$ = "right"
+        Case &h10 : s$ = "escape"        ' Select
+        Case &h20 : s$ = "use-item"      ' Start
+        Case &h40 : s$ = "search"        ' Fire B
+        Case &h41 : s$ = "toggle-item"   ' Down + Fire B
+        Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
+        Case &h80 : s$ = "move"          ' Fire A
+        Case &h81 : s$ = "fire-down"     ' Down + Fire A
+        Case &h82 : s$ = "fire-left"     ' Left + Fire A
+        Case &h84 : s$ = "fire-up"       ' Up + Fire A
+        Case &h88 : s$ = "fire-right"    ' Right + Fire A
+        Case &hC0 : s$ = "map"           ' Fire A + Fire B
     End Select
-
+    
     ctrl_gamemite$ = s$
     Exit Function
   Else
@@ -2071,38 +2080,38 @@ Function ctrl_gamemite$(init%)
     Next
   EndIf
 End Function
-
-
-' Controller driver for NES gamepad connected to PicoGAME VGA port A.
+  
+  
+  ' Controller driver for NES gamepad connected to PicoGAME VGA port A.
 Function ctrl_nes_a$(init%)
   If Not init% Then
     Local bits%, i%, s$
-
+    
     Pulse NES_A_LATCH, NES_PULSE!
     For i% = 0 To 7
       If Not Pin(NES_A_DATA) Then bits%=bits% Or 2^i%
       Pulse NES_A_CLOCK, NES_PULSE!
     Next
-
+    
     Select Case bits%
-      Case 0    : Exit Function
-      Case &h01 : s$ = "move"          ' Fire A
-      Case &h02 : s$ = "search"        ' Fire B
-      Case &h03 : s$ = "map"           ' Fire A + Fire B
-      Case &h04 : s$ = "escape"        ' Select
-      Case &h08 : s$ = "use-item"      ' Start
-      Case &h10 : s$ = "up"
-      Case &h11 : s$ = "fire-up"       ' Up + Fire A
-      Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
-      Case &h20 : s$ = "down"
-      Case &h21 : s$ = "fire-down"     ' Down + Fire A
-      Case &h22 : s$ = "toggle-item"   ' Down + Fire B
-      Case &h40 : s$ = "left"
-      Case &h41 : s$ = "fire-left"     ' Left + Fire A
-      Case &h80 : s$ = "right"
-      Case &h81 : s$ = "fire-right"    ' Right + Fire A
+        Case 0    : Exit Function
+        Case &h01 : s$ = "move"          ' Fire A
+        Case &h02 : s$ = "search"        ' Fire B
+        Case &h03 : s$ = "map"           ' Fire A + Fire B
+        Case &h04 : s$ = "escape"        ' Select
+        Case &h08 : s$ = "use-item"      ' Start
+        Case &h10 : s$ = "up"
+        Case &h11 : s$ = "fire-up"       ' Up + Fire A
+        Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
+        Case &h20 : s$ = "down"
+        Case &h21 : s$ = "fire-down"     ' Down + Fire A
+        Case &h22 : s$ = "toggle-item"   ' Down + Fire B
+        Case &h40 : s$ = "left"
+        Case &h41 : s$ = "fire-left"     ' Left + Fire A
+        Case &h80 : s$ = "right"
+        Case &h81 : s$ = "fire-right"    ' Right + Fire A
     End Select
-
+    
     ctrl_nes_a$ = s$
     Exit Function
   Else
@@ -2113,9 +2122,9 @@ Function ctrl_nes_a$(init%)
     Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
   EndIf
 End Function
-
-
-' Controller driver for Atari joystick connected to PicoGAME VGA port A.
+  
+  
+  ' Controller driver for Atari joystick connected to PicoGAME VGA port A.
 Function ctrl_atari_a$(init%)
   If Not init% Then
     Local bits%, s$
@@ -2124,52 +2133,52 @@ Function ctrl_atari_a$(init%)
     Inc bits%, Not Pin(GP1) * &h04 ' Down
     Inc bits%, Not Pin(GP2) * &h08 ' Left
     Inc bits%, Not Pin(GP3) * &h10 ' Right
-
+    
     Select Case bits%
-      Case 0    : Exit Function
-      Case &h02 : s$ = "up"
-      Case &h03 : s$ = "fire-up"
-      Case &h04 : s$ = "down"
-      Case &h05 : s$ = "fire-down"
-      Case &h08 : s$ = "left"
-      Case &h09 : s$ = "fire-left"
-      Case &h10 : s$ = "right"
-      Case &h11 : s$ = "fire-right"
+        Case 0    : Exit Function
+        Case &h02 : s$ = "up"
+        Case &h03 : s$ = "fire-up"
+        Case &h04 : s$ = "down"
+        Case &h05 : s$ = "fire-down"
+        Case &h08 : s$ = "left"
+        Case &h09 : s$ = "fire-left"
+        Case &h10 : s$ = "right"
+        Case &h11 : s$ = "fire-right"
     End Select
-
+    
     ctrl_atari_a$ = s$
     Exit Function
   Else
     SetPin GP0, DIn : SetPin GP1, DIn : SetPin GP2, DIn : SetPin GP3, DIn : SetPin GP14, DIn
   EndIf
 End Function
-
-
-' Use a function to save 256 bytes of heap that a string would take.
+  
+  
+  ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
-  Select Case Mm.Info(Path)
-    Case "", "NONE" : path$ = Cwd$
-    Case Else: path$ = Mm.Info(Path)
+  Select Case Mm.Info(path)
+      Case "", "NONE" : path$ = Cwd$
+      Case Else: path$ = Mm.Info(path)
   End Select
   If Len(f$) Then Cat path$, "/" + f$
 End Function
-
-
-' Reads property from config (.ini) file.
-'
-' @param  key$      case-insensitive key for property to lookup.
-' @param  default$  value to return if property or file is not present.
-' @param  file$     file to read. If empty then read "A:/.spconfig", or
-'                   if that is not present "A:/.config".
+  
+  
+  ' Reads property from config (.ini) file.
+  '
+  ' @param  key$      case-insensitive key for property to lookup.
+  ' @param  default$  value to return if property or file is not present.
+  ' @param  file$     file to read. If empty then read "A:/.spconfig", or
+  '                   if that is not present "A:/.config".
 Function sys.get_config$(key$, default$, file$)
   sys.get_config$ = default$
   If file$ = "" Then
-    Const file_$ = Choice(Mm.Info(Exists File "A:/.spconfig"), "A:/.spconfig", "A:/.config")
+    Const file_$ = Choice(Mm.Info(Exists file "A:/.spconfig"), "A:/.spconfig", "A:/.config")
   Else
     Const file_$ = file$
   EndIf
-  If Not Mm.Info(Exists File file_$) Then Exit Function
-
+  If Not Mm.Info(Exists file file_$) Then Exit Function
+  
   Local key_$ = LCase$(key$), s$, v$
   Open file_$ For Input As #1
   Do While Not Eof(#1)
@@ -2184,8 +2193,8 @@ Function sys.get_config$(key$, default$, file$)
   Loop
   Close #1
 End Function
-
-
+  
+  
 colors:
   '--Colorscheme accordung to Spritecolors
   Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
