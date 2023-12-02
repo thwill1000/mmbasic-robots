@@ -58,6 +58,8 @@
   Const ys=4*24             'vert window centre with 24*24 tile reference
   Dim xs=5*24               'hor window centre with 24*24 tile reference
   
+  Dim quit_counter%         ' If ESCAPE/START is pressed whilst > 0 then quit current game.
+
   'start positions player in map in # tiles
   xp=UX(0):yp=UY(0)         'xp and yp are used parallel to UX(0) and UY(0)
   UA(0)=0                   'UA=sprite number
@@ -110,6 +112,8 @@
   
   'main player input loop -----------------------------------------
   Do
+    If quit_counter% Then Inc quit_counter%, -1
+
     'player input through keyboard, clearing buffer, check loop time
     k$="":Text 290,0,Right$("00"+Str$(timer,3,0),3)
     Do
@@ -173,6 +177,12 @@
           pl_it=(pl_it+1) Mod 5
           show_item
           Play modsample s_cycle_item,4
+        Case "toggle-mode"
+          Select Case pl_md
+            Case p_s1, p_s2 : pl_md = p_m1
+            Case p_m1, p_m2 : pl_md = p_w
+            Case Else : pl_md = p_s1
+          End Select
         Case "cheat" 'F3 cheat key as long as you are alive
           if UH(0)>0 then
             UH(0)=12                      'full life
@@ -182,19 +192,36 @@
             pl_mk=100                     'full medkit
           end if
         Case "map" 'TAB key show map + toggle player/robots
+          Play ModSample s_beep, 4
+          Select Case map_mode
+            Case 0 : map_mode = 1
+            Case 1 : map_mode = Choice(diff_level < 2, 2, 0)
+            Case 2 : map_mode = Choice(diff_level < 1, 3, 0)
+            Case 3 : map_mode = 0
+          End Select
           Select Case map_mode
             Case 0
-              map_mode=1      'stop showing normal mode
-              renderLiveMap   'show map mode
-            Case 1
-              if diff_level<2 then map_mode=2 else map_mode=0
-            Case 2
-              if diff_level<1 then map_mode=3 else map_mode=0
-            Case 3
-              map_mode=0
-              FRAMEBUFFER write l:CLS  col(5):FRAMEBUFFER write sc$ 'clear layer
+              FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
               writeplayer(hp,vp,pl_wp)
+              WriteComment("Map deactivated")
+            Case 1
+              RenderLiveMap()
+              WriteComment("Map activated")
+            Case 2
+              WriteComment("Map displaying robots")
+            Case 3
+              WriteComment("Map displaying objects")
           End Select
+        Case "escape", "start"
+          If quit_counter% Then
+            k$ = "escape" ' Quit at end of loop.
+          Else
+            Play ModSample s_beep, 4
+            WriteComment("Press ESCAPE/START to QUIT")
+            quit_counter% = 20
+            k$ = "" ' Do not quit at end of loop.
+          EndIf
+
       End Select
       
       'fire weapon
@@ -254,18 +281,9 @@
       
     EndIf 'pl_md<p_death
     
-    If k$ = "escape" Then
-      writecomment("PAUSE, press <ESC> to quit")
-      kill_kb
-      do
-        pause 100:k$=read_input$()
-      loop while k$=""
-      If k$ <> "escape" Then k$="" : writecomment("continue") 'any value that does not quit
-    end if
-    
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     
-  Loop Until k$ = "escape"   'quit when <esc> is pressed
+  Loop Until k$ = "escape"
   
   game_end
   If LCD_DISPLAY Then FrameBuffer Copy f,n
@@ -919,6 +937,7 @@ Sub AI_units
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
             if dx=0 And dy=0 then
               if UC(i)=0 then
+                quit_counter% = 20
                 k$ = "escape" 'force game over by simulate pressing ESC
               else
                 xp=UC(i):yp=UD(i) 'transport player
@@ -1662,6 +1681,7 @@ End Sub
   
   'scale the world map to overview mode @Martin
 Sub renderLiveMap
+  If LCD_DISPLAY Then Pause 50 ' Try to reduce graphical glitches
   Local integer mx,my,mp,yy,CL(256)
   Local t$
   box 0,24,11*24,7*24,1,0,0 'clear screen
@@ -1838,9 +1858,9 @@ Sub show_intro
   Local Message$(4) length 40
   
   'set Map to 0, Menu State to 1
-  Message$(1)="...use UP & DOWN, Space or 'Start'      "
-  Message$(2)="   ...use LEFT & RIGHT to select Map    "
-  Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
+  Message$(1)="       Use UP & DOWN, Space/START       "
+  Message$(2)="      Use LEFT & RIGHT, Space/START     "
+  Message$(3)="      Use LEFT & RIGHT, Space/START     "
   dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
   Map_Nr=0:MS=1:Difficulty=1
   
@@ -1854,11 +1874,12 @@ Sub show_intro
 '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
   Local msg$ = String$(36,32)
-'  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
-  Cat msg$, "Original Game by David Murray - "
-  Cat msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
-  Cat msg$, "Community - Music by Noelle Aman, Graphic by "
-  Cat msg$, "Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
+  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " detected - "
+  Cat msg$, "Original game by David Murray - "
+  Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
+  Cat msg$, "Graphics by Piotr Radecki - "
+  Cat msg$, "Music by Noelle Aman - "
+  Cat msg$, "MMBasic by Geoff Graham & Peter Mather"
   flip=0
   MT=0
   
@@ -1873,7 +1894,7 @@ Sub show_intro
         play modsample s_beep-2,4
         If k$="down" Then Inc MS,(MS<4)
         If k$="up" Then Inc MS,-(MS>1)
-        If k$="use-item" Then
+        If InStr("use-item,start,fire-a", k$) Then
           Select Case MS
             Case 1
               FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
@@ -1882,46 +1903,48 @@ Sub show_intro
               'select map
               kill_kb
               Text 0,224,message$(2),,,,col(3)
+              If LCD_DISPLAY Then FrameBuffer Merge 9,b
               Do
                 k$=read_input$()
                 If k$<>"" Then
                   play modsample s_beep-2,4
-                  If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
-                  If k$="right" Then Inc Map_Nr,(Map_Nr<13)
-                  If k$="use-item" Then
+                  If k$="left" Then
+                    Inc Map_Nr,-(Map_Nr>0)
+                  ElseIf k$="right" Then
+                    Inc Map_Nr,(Map_Nr<13)
+                  ElseIf InStr("use-item,start,fire-a", k$) Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
                   Text 9,70,"                "
                   Text 9,70,UCase$(map_nam$(Map_Nr))
                   If LCD_DISPLAY Then FrameBuffer Merge 9,b
+                  Pause 200
                 EndIf
-                Pause 200
               Loop
               kill_kb
             Case 3
               'select DIFFICULTY
               kill_kb
               Text 0,224,message$(3),,,,col(3)
+              If LCD_DISPLAY Then FrameBuffer Merge 9,b
               Do
                 k$=read_input$()
                 If k$<>"" Then
                   play modsample s_beep-2,4
-                  If k$="use-item" Then
+                  If InStr("use-item,start,fire-a", k$) Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
                     Exit
-                  EndIf
-                  If k$="left" Then
+                  ElseIf k$="left" Then
                     Inc Diff_Level,-(Diff_Level>0)
-                  EndIf
-                  If k$="right" Then
+                  ElseIf k$="right" Then
                     Inc Diff_Level,(Diff_Level<2)
                   EndIf
                   Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
                   Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
                   If LCD_DISPLAY Then FrameBuffer Merge 9,b
+                  Pause 200
                 EndIf
-                Pause 200
               Loop
               kill_kb
             Case 4
@@ -1985,9 +2008,20 @@ Sub fade_out
 End Sub
   
 Function read_input$()
+  Static last$
   read_input$ = read_inkey$()
   If Len(read_input$) Then Exit Function
   read_input$ = Call(CTRL_DRIVER$)
+
+  ' Suppress auto-repeat except for movement.
+  If last$ = read_input$ Then
+    If Not InStr("up,down,left,right", last$) Then
+      read_input$ = ""
+      Exit Function
+    EndIf
+  Else
+    last$ = read_input$
+  EndIf
 End Function
   
 Function read_inkey$()
@@ -2057,17 +2091,17 @@ Function ctrl_gamemite$(init%)
         Case &h02 : s$ = "left"
         Case &h04 : s$ = "up"
         Case &h08 : s$ = "right"
-        Case &h10 : s$ = "escape"        ' Select
-        Case &h20 : s$ = "use-item"      ' Start
-        Case &h40 : s$ = "search"        ' Fire B
-        Case &h41 : s$ = "toggle-item"   ' Down + Fire B
-        Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
-        Case &h80 : s$ = "move"          ' Fire A
-        Case &h81 : s$ = "fire-down"     ' Down + Fire A
-        Case &h82 : s$ = "fire-left"     ' Left + Fire A
-        Case &h84 : s$ = "fire-up"       ' Up + Fire A
+        Case &h10 : s$ = "toggle-mode"   ' Select
+        Case &h20 : s$ = "start"         ' Start
+        Case &h41 : s$ = "toggle-item"   ' Down  + Fire B
+        Case &h42 : s$ = "use-item"      ' Left  + Fire B
+        Case &h44 : s$ = "toggle-weapon" ' Up    + Fire B
+        Case &h48 : s$ = "map"           ' Right + Fire B
+        Case &h80 : s$ = "fire-a"        ' Fire A
+        Case &h81 : s$ = "fire-down"     ' Down  + Fire A
+        Case &h82 : s$ = "fire-left"     ' Left  + Fire A
+        Case &h84 : s$ = "fire-up"       ' Up    + Fire A
         Case &h88 : s$ = "fire-right"    ' Right + Fire A
-        Case &hC0 : s$ = "map"           ' Fire A + Fire B
     End Select
     
     ctrl_gamemite$ = s$
@@ -2095,11 +2129,9 @@ Function ctrl_nes_a$(init%)
     
     Select Case bits%
         Case 0    : Exit Function
-        Case &h01 : s$ = "move"          ' Fire A
-        Case &h02 : s$ = "search"        ' Fire B
-        Case &h03 : s$ = "map"           ' Fire A + Fire B
-        Case &h04 : s$ = "escape"        ' Select
-        Case &h08 : s$ = "use-item"      ' Start
+        Case &h01 : s$ = "fire-a"        ' Fire A
+        Case &h04 : s$ = "toggle-mode"   ' Select
+        Case &h08 : s$ = "start"         ' Start
         Case &h10 : s$ = "up"
         Case &h11 : s$ = "fire-up"       ' Up + Fire A
         Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
@@ -2108,8 +2140,10 @@ Function ctrl_nes_a$(init%)
         Case &h22 : s$ = "toggle-item"   ' Down + Fire B
         Case &h40 : s$ = "left"
         Case &h41 : s$ = "fire-left"     ' Left + Fire A
+        Case &h42 : s$ = "use-item"      ' Left + Fire B
         Case &h80 : s$ = "right"
         Case &h81 : s$ = "fire-right"    ' Right + Fire A
+        Case &h82 : s$ = "map"           ' Right + Fire B
     End Select
     
     ctrl_nes_a$ = s$
@@ -2136,6 +2170,7 @@ Function ctrl_atari_a$(init%)
     
     Select Case bits%
         Case 0    : Exit Function
+        Case &h02 : s$ = "fire-a"
         Case &h02 : s$ = "up"
         Case &h03 : s$ = "fire-up"
         Case &h04 : s$ = "down"
