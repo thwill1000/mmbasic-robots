@@ -2170,7 +2170,7 @@ Function ctrl_atari_a$(init%)
     
     Select Case bits%
         Case 0    : Exit Function
-        Case &h02 : s$ = "fire-a"
+        Case &h01 : s$ = "fire-a"
         Case &h02 : s$ = "up"
         Case &h03 : s$ = "fire-up"
         Case &h04 : s$ = "down"
