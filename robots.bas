@@ -2058,7 +2058,7 @@ Function init_controller$()
     Case "Game*Mite"
       init_controller$ = "ctrl_gamemite$"
     Case "PicoGAME VGA"
-      Select Case LCase$(sys.get_config$("default-controller", "nes_a"))
+      Select Case LCase$(sys.get_config$("controller", "nes_a"))
         Case "none", ""
           init_controller$ = "ctrl_none$"
         Case "nes_a", "nes-a"
@@ -2066,7 +2066,7 @@ Function init_controller$()
         Case "atari_a", "atari-a"
           init_controller$ = "ctrl_atari_a$"
         Case Else
-          Error "Unsupported default controller: " + sys.get_config$("default-controller", "nes_a")
+          Error "Unsupported default controller: " + sys.get_config$("controller", "nes_a")
       End Select
     Case Else
       Error "Unsupported device: " + sys.get_config$("device", Mm.Device$)
