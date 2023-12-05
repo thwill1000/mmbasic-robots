@@ -28,7 +28,7 @@
   
   'start of the actual game -----------------------------------
   loading 'show message on L
-  '  CLS
+  
   
   'get world map
   loadworld
@@ -74,14 +74,15 @@
   
   'start music/sfx modfile
   music=1
-  '  Play stop:Play modfile path$("music/sfcmetallicbop2.mod")   'sfx combined with music
   select_music(map_nr mod 3)
   
   'write initial world
   map_mode=0              'overview world map off
-  writeworld_n(xm,ym)     'initialwold
-  framebuffer write L:fade_in:framebuffer write sc$
   ani_timer=1             'world animations
+  writeworld_n(xm,ym)     'initialwold
+  writecomment("Welcome to PETSCII Robots")
+  writecomment("Find and destroy "+str$(start_bots)+" robots")
+  framebuffer write L:fade_in:framebuffer write sc$
   
   'game play variables
   spn=0                   'sprite number
@@ -128,7 +129,7 @@
       'player controls movement of player character
       v=(k$ = "down") - (k$ = "up")
       h=(k$ = "right") - (k$ = "left")
-      If h+v<>0 Then                        'any cursor key pressed
+      If h+v<>0 and map_mode<2 Then               'any cursor key pressed
         
         Select Case pl_md
           Case p_w
@@ -253,7 +254,7 @@
       'update the world in the viewing window
       If map_mode=0 Then
         
-        'the viewe modes animated in the main loop
+        'the viewer modes animated in the main loop
         Select Case pl_md
           Case p_s1
             show_mode(&h53)  'show viewer
@@ -775,7 +776,7 @@ Sub AI_units
             if em_on=0 then walk_bot_h(i,dx,dy,b_hov)
           end if
         else  'sudden death" 2 seconds delay for dead body to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
       Case 3 'hoverbot_v
         If UH(i)>0 Then
@@ -785,7 +786,7 @@ Sub AI_units
             if em_on=0 then walk_bot_v(i,dx,dy,b_hov)
           end if
         Else  'sudden death" 2 seconds delay for dead body to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
       Case 4 'hoverbot attack
         If UH(i)>0 Then
@@ -803,13 +804,13 @@ Sub AI_units
             end if
           end if
         Else  'create a 1-2 seconds delay for the dead robot to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
       Case 5 'hoverbot_drowning
         UD(i)=(UD(i)+1) Mod 6 'adapt for drowning speed
         if UD(i)=0 then
           UA(i)=UA(i)+1
-          if UA(i)>&h8e then UT(i)=0
+          if UA(i)>&h8e then UT(i)=0:robot_end
         end if
       Case 9 'evilbot chase player
         If UH(i)>0 Then
@@ -827,7 +828,7 @@ Sub AI_units
             end if
           end if
         Else  'create a 1-2 seconds delay for the dead robot to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
       Case 17 'rollerbot_v
         If UH(i)>0 Then
@@ -842,7 +843,7 @@ Sub AI_units
             If dx=0 Then bot_shoot_v(i,dy)
           EndIf
         Else  'create a 1-2 seconds delay for the dead body to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
       Case 18 'rollerbot_h
         If UH(i)>0 Then
@@ -857,7 +858,7 @@ Sub AI_units
             If dx=0 Then bot_shoot_v(i,dy)
           EndIf
         Else  'create a 1-2 seconds delay for the dead body to vanish
-          Inc UH(i),-1:If UH(i)<-30 Then UT(i)=0
+          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
         EndIf
     End Select
   Next
@@ -871,7 +872,7 @@ Sub AI_units
       Case 71 'bomb
         Inc UB(i),-1
         If UB(i)=0 Then
-          do_damage(UX(i),UY(i),UC(i),UD(i),1) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
           UA(i)=247 'explosion tile
           Play modsample s_dsbarexp,4
         EndIf
@@ -917,7 +918,7 @@ Sub AI_units
         inc UB(i),1
       Case 74 'canister blow or plasma blow
         if UA(i)=247 then 'only once...
-          do_damage(UX(i),UY(i),UC(i),UD(i),0) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
           Play modsample s_dsbarexp,4
         end if
         Inc UA(i),1  'next tile in explosion sequence
@@ -970,10 +971,12 @@ Sub AI_units
             if UH(j)>0 then
               UB(i)=1:play modsample s_door,4 'start animation
               UH(j)=0:UT(j)=0 'kill item immediately, and remove from play
+              writecomment(Choice(j, "robot", "player") + " terminated")
             end if
           end if
         else 'object in TC, crush it...
           if UB(i)=0 then UB(i)=1:play modsample s_door,4 'start animation
+          writecomment("object crushed")
         end if
         if UB(i)>0 then crush(i,UX(i),UY(i))
       case 19 'elevator
@@ -1019,6 +1022,18 @@ Sub AI_units
     End Select
   Next
 End Sub
+  
+  
+sub robot_end
+  local j,k
+  statistics(j,k)
+  if j>0 then
+    writecomment("Target destroyed, "+str$(j)+" remain")
+  else
+    writecomment("All robots destroyed")
+    writecomment("Proceed to the teleporter")
+  end if
+end sub
   
   
   'for hoverbot and evilbot use same tracing algorithm
@@ -1219,8 +1234,8 @@ End Sub
   
   
   'applies d damage to all units and objects in a radius
-Sub do_damage(x,y,r,d,s)
-  Local i,j,a,rr,t$
+Sub do_damage(x,y,r,d)
+  Local i,j,a,rr
   
   For i=0 To 27 'all units
     If Abs(UX(i)-x)<r then
@@ -1240,23 +1255,27 @@ Sub do_damage(x,y,r,d,s)
     For j=-rr To rr
       a=Asc(Mid$(lv$(y+j),x+i+1,1))
       Select Case a
+        case &h80,&H81 'pi-paintings
+          'do nothing
         Case &h83
           MID$(lv$(y+j),i+x+1,1)=Chr$(&h87) 'canister blown
           If i<>0 Or j<>0 Then blow_canister(x+i,y+j) 'not itself
-        Case &h29,&h2A
-          if s=0 then t$=Chr$(&h2A) else t$=chr$(9) 'carton box
-          MID$(lv$(y+j),i+x+1,1)=t$
-        Case &hC7,&hC6
-          if s=0 then t$=Chr$(&hC6) else t$=chr$(9) 'wooden box
-          MID$(lv$(y+j),i+x+1,1)=t$
-        Case &h2D,&h2E
-          if s=0 then t$=Chr$(&h2E) else t$=chr$(9) 'small box
-          MID$(lv$(y+j),i+x+1,1)=t$
-        Case &hCD
-          if s=0 then t$=Chr$(&hCC) else t$=chr$(9) 'bridge
-          MID$(lv$(y+j),i+x+1,1)=t$
-        case &h18
-          MID$(lv$(y+j),i+x+1,1)=Chr$(9) 'plant
+        Case &h29 'carton box, empty
+          MID$(lv$(y+j),i+x+1,1)=Chr$(&h2A)
+        Case &hC7 'wooden box, empty
+          MID$(lv$(y+j),i+x+1,1)=Chr$(&hC6)
+        Case &h2D 'small box, empty
+          MID$(lv$(y+j),i+x+1,1)=Chr$(&h2E)
+        Case &hCD 'bridge. empty
+          MID$(lv$(y+j),i+x+1,1)=Chr$(&hCC)
+        case <&hCD 'indoor plant or empty boxes -> destroy
+          if (get_ta(x+i,y+j) And b_dmg) then
+            MID$(lv$(y+j),i+x+1,1)=Chr$(9)
+          end if
+        case >&hCD 'outdoor -> destroy
+          if (get_ta(x+i,y+j) And b_dmg) then
+            MID$(lv$(y+j),i+x+1,1)=Chr$(&hD0)
+          end if
       End Select
     Next
   Next
@@ -1380,25 +1399,30 @@ Sub fire_ew(p)
         typ=Asc(Mid$(lv$(yp),xip+1,1))
         
         j=has_unit(UX(i),UY(i))
-        If j<255 Then' if robot then damage it
+        If j<255 Then 'if robot then damage it
           explosion(i)
           if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
           
-        ElseIf (t And (b_wlk+b_hov)) Then   'pass fire, next tile
-          
         ElseIf typ=&h83 Then 'canister
           blow_canister(xip,yp)
           Inc x,-p:Exit
           
-        ElseIf (t And (b_see))=0 or typ=&h18 Then  'stopped by wall or plant
+        elseif typ=&h81 Then 'vertical pi-sign
+          Mid$(lv$(yp),xip+1,1)=chr$(8)
           explosion(i)
           Inc x,-p:Exit
-
+          
+        ElseIf (t And (b_see+b_wlk+b_hov)) Then  'pass fire, next tile
+          
+        Else'If (t And (b_see))=0 Then  'stopped by wall
+          explosion(i)
+          Inc x,-p:Exit
+          
         EndIf
         
-      Loop Until Abs(x)=xm        
+      Loop Until Abs(x)=xm
       
       'register for screen
       If Abs(x)>=1 Then
@@ -1438,7 +1462,7 @@ Sub fire_ns(p)
         
         Inc y,p:yip=yp+y
         t=get_ta(xp,yip):UY(i)=yip 'next tile n/s
-        typ=Asc(Mid$(lv$(yp+y),xp+1,1))
+        typ=Asc(Mid$(lv$(yip),xp+1,1))
         
         j=has_unit(UX(i),UY(i))
         If j<255 Then 'if robot then damage it
@@ -1447,20 +1471,25 @@ Sub fire_ns(p)
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
           
-        ElseIf (t And (b_wlk+b_hov)) Then   'pass fire, next tile
-          
         ElseIf typ=&h83 Then 'canister
           blow_canister(xp,yip)
           Inc y,-p:Exit
+
+        ElseIf typ=&h80 Then 'horizontal pi-sign
+          Mid$(lv$(yip),xp+1,1)=chr$(5)
+          explosion(i)
+          Inc y,-p:Exit
           
-        ElseIf (t And (b_see))=0 or typ=&h18 Then  'stopped by wall
+        ElseIf (t And (b_see+b_wlk+b_hov)) Then   'pass fire, next tile
+          
+        Else'If (t And (b_see))=0 Then  'stopped by wall
           explosion(i)
           Inc y,-p:Exit
           
         EndIf
-
+        
       Loop Until Abs(y)=ym
-    
+      
       'register for screen
       If Abs(y)>=1 Then
         UT(i)=12+(y>0):UC(i)=y:UA(i)=248-4*pl_wp
@@ -1870,8 +1899,8 @@ Sub show_intro
   
   'Display Map Name
   Text 9,70,UCase$(map_nam$(Map_Nr))
-
-'--- copyright notices etc
+  
+  '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
   Local msg$ = String$(36,32)
   Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " detected - "
@@ -2066,7 +2095,7 @@ Function init_controller$()
         Case "atari_a", "atari-a"
           init_controller$ = "ctrl_atari_a$"
         Case Else
-          Error "Unsupported default controller: " + sys.get_config$("controller", "nes_a")
+          Error "Unsupported controller: " + sys.get_config$("controller", "nes_a")
       End Select
     Case Else
       Error "Unsupported device: " + sys.get_config$("device", Mm.Device$)
