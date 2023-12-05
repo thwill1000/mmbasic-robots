@@ -58,7 +58,7 @@
   Const ys=4*24             'vert window centre with 24*24 tile reference
   Dim xs=5*24               'hor window centre with 24*24 tile reference
   
-  Dim quit_counter%         ' If ESCAPE/START is pressed whilst > 0 then quit current game.
+  Dim quit_counter%         ' If QUIT is pressed whilst > 0 then quit current game.
 
   'start positions player in map in # tiles
   xp=UX(0):yp=UY(0)         'xp and yp are used parallel to UX(0) and UY(0)
@@ -192,6 +192,8 @@
             pl_bo=100:pl_em=100:pl_ma=100 'all items
             pl_mk=100                     'full medkit
           end if
+        ' Case "kill-all"
+        '   For i = 1 To 63: UH(i) = 0 : Next
         Case "map" 'TAB key show map + toggle player/robots
           Play ModSample s_beep, 4
           Select Case map_mode
@@ -206,19 +208,18 @@
               writeplayer(hp,vp,pl_wp)
               WriteComment("Map deactivated")
             Case 1
-              RenderLiveMap()
               WriteComment("Map activated")
+              RenderLiveMap()
             Case 2
               WriteComment("Map displaying robots")
             Case 3
               WriteComment("Map displaying objects")
           End Select
-        Case "escape", "start"
-          If quit_counter% Then
-            k$ = "escape" ' Quit at end of loop.
-          Else
+        Case "quit"
+          If Not quit_counter% Then
             Play ModSample s_beep, 4
-            WriteComment("Press ESCAPE/START to QUIT")
+
+            WriteComment("Press " + quit_keys$() + " to QUIT")
             quit_counter% = 20
             k$ = "" ' Do not quit at end of loop.
           EndIf
@@ -279,12 +280,12 @@
         anim_map
         
       EndIf
-      
+
     EndIf 'pl_md<p_death
     
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     
-  Loop Until k$ = "escape"
+  Loop Until k$ = "quit"
   
   game_end
   If LCD_DISPLAY Then FrameBuffer Copy f,n
@@ -458,7 +459,7 @@ Sub game_over
   Box xs-32,ys,88,24,1,textc,bckgnd
   Text xs-24,ys+8,"GAME OVER",,,,textc,bckgnd
   pl_md=p_death
-  framebuffer write sc$:writecomment("press <ESC>"):framebuffer write l
+  framebuffer write sc$:writecomment("Press " + quit_keys$()):framebuffer write l
 End Sub
   
   
@@ -761,7 +762,7 @@ End Sub
   'routine runs in layer L, only some UNITS revert to n
   
 Sub AI_units
-  Local i,dx,dy,nearx,neary,xy,j,k
+  Local i,dx,dy,nearx,neary,xy,j
   
   For i=0 To 27 'units
     dx=UX(i)-xp:dy=UY(i)-yp
@@ -939,7 +940,7 @@ Sub AI_units
             if dx=0 And dy=0 then
               if UC(i)=0 then
                 quit_counter% = 20
-                k$ = "escape" 'force game over by simulate pressing ESC
+                k$ = "quit" 'force game over by simulate pressing ESC
               else
                 xp=UC(i):yp=UD(i) 'transport player
               end if
@@ -1903,12 +1904,12 @@ Sub show_intro
   '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
   Local msg$ = String$(36,32)
-  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " detected - "
+  Cat msg$, Call(CTRL_DRIVER$, 2) + " - "
   Cat msg$, "Original game by David Murray - "
   Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
   Cat msg$, "Graphics by Piotr Radecki - "
   Cat msg$, "Music by Noelle Aman - "
-  Cat msg$, "MMBasic by Geoff Graham & Peter Mather"
+  Cat msg$, "MMBasic by Geoff Graham & Peter Mather "
   flip=0
   MT=0
   
@@ -2054,64 +2055,64 @@ Function read_input$()
 End Function
   
 Function read_inkey$()
+  Local s$
   Select Case Asc(Inkey$)
       Case 0   : Exit Function
-      Case 9   : read_inkey$ = "map"          ' Tab
-      Case 27  : read_inkey$ = "escape"
-      Case 32  : read_inkey$ = "use-item"     ' Space
-      Case 77  : read_inkey$ = "toggle-music" ' M
-      Case 97  : read_inkey$ = "fire-left"    ' a
-      Case 100 : read_inkey$ = "fire-right"   ' d
-      Case 109 : read_inkey$ = "move"         ' m
-      Case 115 : read_inkey$ = "fire-down"    ' s
-      Case 119 : read_inkey$ = "fire-up"      ' w
-      Case 121, 122 : read_inkey$ = "search"  ' y, z
-      Case 128 : read_inkey$ = "up"
-      Case 129 : read_inkey$ = "down"
-      Case 130 : read_inkey$ = "left"
-      Case 131 : read_inkey$ = "right"
-      Case 145 : read_inkey$ = "toggle-weapon" ' F1
-      Case 146 : read_inkey$ = "toggle-item"   ' F2
-      Case 147 : read_inkey$ = "cheat"         ' F3
-      Case 148 : read_inkey$ = "kill-all"      ' F4
+      Case 9   : s$ = "map"          ' Tab
+      Case 27  : s$ = "quit"
+      Case 32  : s$ = "use-item"     ' Space
+      Case 77  : s$ = "toggle-music" ' M
+      Case 97  : s$ = "fire-left"    ' a
+      Case 100 : s$ = "fire-right"   ' d
+      Case 109 : s$ = "move"         ' m
+      Case 115 : s$ = "fire-down"    ' s
+      Case 119 : s$ = "fire-up"      ' w
+      Case 121, 122 : s$ = "search"  ' y, z
+      Case 128 : s$ = "up"
+      Case 129 : s$ = "down"
+      Case 130 : s$ = "left"
+      Case 131 : s$ = "right"
+      Case 145 : s$ = "toggle-weapon" ' F1
+      Case 146 : s$ = "toggle-item"   ' F2
+      Case 147 : s$ = "cheat"         ' F3
+      Case 148 : s$ = "kill-all"      ' F4
   End Select
+  read_inkey$ = s$
 End Function
   
   '---joystick/Gamepad specific settings
   
   
 Function init_controller$()
-  Select Case sys.get_config$("device", Mm.Device$)
-    Case "PicoMite", "PicoMiteVGA"
-      init_controller$ = "ctrl_none$"
-    Case "Game*Mite"
-      init_controller$ = "ctrl_gamemite$"
-    Case "PicoGAME VGA"
-      Select Case LCase$(sys.get_config$("controller", "nes_a"))
-        Case "none", ""
-          init_controller$ = "ctrl_none$"
-        Case "nes_a", "nes-a"
-          init_controller$ = "ctrl_nes_a$"
-        Case "atari_a", "atari-a"
-          init_controller$ = "ctrl_atari_a$"
-        Case Else
-          Error "Unsupported controller: " + sys.get_config$("controller", "nes_a")
-      End Select
-    Case Else
-      Error "Unsupported device: " + sys.get_config$("device", Mm.Device$)
-  End Select
+  Local platform$ = Mm.Info$(Platform)
+  If platform$ = "" Then platform$ = Mm.Device$
+  Local ctrl$ = LCase$(sys.get_config$("controller"))
+  If ctrl$ = "" Then
+    Select Case LCase$(platform$)
+      Case "picomite", "picomitevga" : ctrl$ = "none"
+      Case "game*mite" : ctrl$ = "gamemite"
+      Case "picogame vga" : ctrl$ = "nes_a"
+      Case Else
+        Error "Unsupported platform: " + platform$
+    End Select
+  EndIf
+  ctrl$ = str.replace$(ctrl$, "-", "_")
+  init_controller$ = "ctrl_" +  ctrl$ + "$"
+  On Error Skip
   Local s$ = Call(init_controller$, 1)
+  If Mm.ErrNo Then Error "Unsupported controller: " + ctrl$
 End Function
   
   
   ' Dummy controller driver.
-Function ctrl_none$(init%)
+Function ctrl_none$(mode%)
+  If mode% = 2 Then ctrl_none$ = "Keyboard"
 End Function
   
   
   ' Controller driver for Game*Mite.
-Function ctrl_gamemite$(init%)
-  If Not init% Then
+Function ctrl_gamemite$(mode%)
+  If Not mode% Then
     Local bits% = Inv Port(GP8, 8) And &hFF, s$
     
     Select Case bits%
@@ -2121,7 +2122,7 @@ Function ctrl_gamemite$(init%)
         Case &h04 : s$ = "up"
         Case &h08 : s$ = "right"
         Case &h10 : s$ = "toggle-mode"   ' Select
-        Case &h20 : s$ = "start"         ' Start
+        Case &h20 : s$ = "use-item"      ' Start
         Case &h41 : s$ = "toggle-item"   ' Down  + Fire B
         Case &h42 : s$ = "use-item"      ' Left  + Fire B
         Case &h44 : s$ = "toggle-weapon" ' Up    + Fire B
@@ -2131,23 +2132,26 @@ Function ctrl_gamemite$(init%)
         Case &h82 : s$ = "fire-left"     ' Left  + Fire A
         Case &h84 : s$ = "fire-up"       ' Up    + Fire A
         Case &h88 : s$ = "fire-right"    ' Right + Fire A
+        Case &hC0 : s$ = "quit"          ' Fire A + Fire B
     End Select
     
     ctrl_gamemite$ = s$
     Exit Function
-  Else
+  ElseIf mode% = 1 Then
     ' Initialise GP8-GP15 as digital inputs with PullUp resistors
     Local i%
     For i% = 8 To 15
       SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
     Next
+  ElseIf mode% = 2 Then
+    ctrl_gamemite$ = "Game*Mite"
   EndIf
 End Function
   
   
   ' Controller driver for NES gamepad connected to PicoGAME VGA port A.
-Function ctrl_nes_a$(init%)
-  If Not init% Then
+Function ctrl_nes_a$(mode%)
+  If Not mode% Then
     Local bits%, i%, s$
     
     Pulse NES_A_LATCH, NES_PULSE!
@@ -2159,8 +2163,9 @@ Function ctrl_nes_a$(init%)
     Select Case bits%
         Case 0    : Exit Function
         Case &h01 : s$ = "fire-a"        ' Fire A
+        Case &h03 : s$ = "quit"          ' Fire A + Fire B
         Case &h04 : s$ = "toggle-mode"   ' Select
-        Case &h08 : s$ = "start"         ' Start
+        Case &h08 : s$ = "use-item"      ' Start
         Case &h10 : s$ = "up"
         Case &h11 : s$ = "fire-up"       ' Up + Fire A
         Case &h12 : s$ = "toggle-weapon" ' Up + Fire B
@@ -2177,19 +2182,21 @@ Function ctrl_nes_a$(init%)
     
     ctrl_nes_a$ = s$
     Exit Function
-  Else
+  ElseIf mode% = 1 Then
     SetPin NES_A_DATA, DIn
     SetPin NES_A_LATCH, DOut
     SetPin NES_A_CLOCK, DOut
     SetPin GP14, DOut
     Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
+  ElseIf mode% = 2 Then
+    ctrl_nes_a$ = "NES Gamepad A"
   EndIf
 End Function
   
   
   ' Controller driver for Atari joystick connected to PicoGAME VGA port A.
-Function ctrl_atari_a$(init%)
-  If Not init% Then
+Function ctrl_atari_a$(mode%)
+  If Not mode% Then
     Local bits%, s$
     Inc bits%, Not Pin(GP14)       ' Fire
     Inc bits%, Not Pin(GP0) * &h02 ' Up
@@ -2212,11 +2219,19 @@ Function ctrl_atari_a$(init%)
     
     ctrl_atari_a$ = s$
     Exit Function
-  Else
+  ElseIf mode% = 1 Then
     SetPin GP0, DIn : SetPin GP1, DIn : SetPin GP2, DIn : SetPin GP3, DIn : SetPin GP14, DIn
+  ElseIf mode% = 2 Then
+    ctrl_atari_a$ = "Atari Joystick A"
   EndIf
 End Function
-  
+
+Function quit_keys$()
+  Select Case CTRL_DRIVER$
+    Case "ctrl_gamemite$", "ctrl_nes_a$" : quit_keys$ = "A + B"
+    Case Else : quit_keys$ = "ESCAPE"
+  End Select
+End Function
   
   ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
@@ -2257,8 +2272,23 @@ Function sys.get_config$(key$, default$, file$)
   Loop
   Close #1
 End Function
-  
-  
+
+
+' Gets copy of 'haystack$' with occurrences of 'needle$' replaced by 'rep$'.
+Function str.replace$(haystack$, needle$, rep$)
+  Local p%, st%, s$
+  Do
+    Inc st%
+    p% = InStr(st%, haystack$, needle$)
+    If p% < 1 Then Exit Do
+    Cat s$, Mid$(haystack$, st%, p% - st%) + rep$
+    st% = p% + Len(needle$) - 1
+  Loop
+  Cat s$, Mid$(haystack$, st%)
+  str.replace$ = s$
+End Function
+
+
 colors:
   '--Colorscheme accordung to Spritecolors
   Data RGB(BLUE),RGB(GREEN),RGB(CYAN),RGB(RED)
