@@ -129,7 +129,7 @@
       'player controls movement of player character
       v=(k$ = "down") - (k$ = "up")
       h=(k$ = "right") - (k$ = "left")
-      If h+v<>0 and map_mode<2 Then               'any cursor key pressed
+      If h+v<>0 And map_mode<2 Then               'any cursor key pressed
         
         Select Case pl_md
           Case p_w
@@ -204,11 +204,12 @@
           End Select
           Select Case map_mode
             Case 0
+              WriteComment("Map deactivated")
               FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
               writeplayer(hp,vp,pl_wp)
-              WriteComment("Map deactivated")
             Case 1
               WriteComment("Map activated")
+              FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
               RenderLiveMap()
             Case 2
               WriteComment("Map displaying robots")
@@ -300,14 +301,17 @@ End
   
   'uses tiles stored in library to build up playfield in layer N
 Sub writeworld_n(xm,ym)
+  local xsn,xpn,spn
   For xn=-xm To xm
+    xsn=xs+xn*24:xpn=xp+xn+1+lva
     For yn=-ym To ym
       'load tile from world map
-      spn=Peek(byte(lva+(yp+yn)*129)+xp+xn+1)
-      Blit memory tile_index(spn),xs+xn*24,ys+yn*24
+      spn=Peek(byte(yp+yn)*129+xpn)
+      Blit memory tile_index(spn),xsn,ys+yn*24
     Next
   Next
 End Sub
+  
   
   'write UNITS's to screen on layer L, no AI, only graphics
 Sub writesprites_l
@@ -623,10 +627,10 @@ End Sub
   
   
 Sub blow_canister(x,y)
-  'UA()=tile,UC()=radius,UD()=damage
+  'UA()=tile,UC()=radius,UH()=damage,UD()=direction
   Local i=findslot()
   If i<32 Then
-    UT(i)=74:UX(i)=x:UY(i)=y:UA(i)=247:UC(i)=2:UD(i)=11
+    UT(i)=74:UX(i)=x:UY(i)=y:UA(i)=247:UC(i)=2:UD(i)=0:UH(i)=11
   EndIf
 End Sub
   
@@ -764,105 +768,107 @@ End Sub
 Sub AI_units
   Local i,dx,dy,nearx,neary,xy,j
   
-  For i=0 To 27 'units
-    dx=UX(i)-xp:dy=UY(i)-yp
-    nearx=Abs(dx):neary=Abs(dy)
-    Select Case UT(i)
-      Case 0,1 'player is animated through controls
-      Case 2 'hoverbot_h
-        If UH(i)>0 Then
-          if UC(i)>1 then
-            if em_on=0 then dazzle_bot(i)
-          else
-            if em_on=0 then walk_bot_h(i,dx,dy,b_hov)
-          end if
-        else  'sudden death" 2 seconds delay for dead body to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-      Case 3 'hoverbot_v
-        If UH(i)>0 Then
-          if UC(i)>1 then
-            if em_on=0 then dazzle_bot(i)
-          else
-            if em_on=0 then walk_bot_v(i,dx,dy,b_hov)
-          end if
-        Else  'sudden death" 2 seconds delay for dead body to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-      Case 4 'hoverbot attack
-        If UH(i)>0 Then
-          UD(i)=(UD(i)+1) Mod 3 'adapt for agression level
-          if UD(i)=0 then
-            if nearx+neary=1 then 'next to player
-              if UH(0)>0 then zap(0) 'show damage to player
-              UH(0)=max(UH(0)-1,0)  'damage player
+  if em_on=0 then
+    For i=0 To 27 'units
+      dx=UX(i)-xp:dy=UY(i)-yp
+      nearx=Abs(dx):neary=Abs(dy)
+      Select Case UT(i)
+        Case 0,1 'player is animated through controls
+        Case 2 'hoverbot_h
+          If UH(i)>0 Then
+            if UC(i)>1 then
+              dazzle_bot(i)
             else
-              if UC(i)>1 then
-                if em_on=0 then dazzle_bot(i)
+              walk_bot_h(i,dx,dy,b_hov)
+            end if
+          else  'sudden death" 2 seconds delay for dead body to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
+          EndIf
+        Case 3 'hoverbot_v
+          If UH(i)>0 Then
+            if UC(i)>1 then
+              dazzle_bot(i)
+            else
+              walk_bot_v(i,dx,dy,b_hov)
+            end if
+          Else  'sudden death" 2 seconds delay for dead body to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
+          EndIf
+        Case 4 'hoverbot attack
+          If UH(i)>0 Then
+            UD(i)=(UD(i)+1) Mod 3 'adapt for agression level
+            if UD(i)=0 then
+              if nearx+neary=1 then 'next to player
+                if UH(0)>0 then zap(0) 'show damage to player
+                UH(0)=max(UH(0)-1,0)  'damage player
               else
-                if em_on=0 then agro_bot(i,dx,dy,b_hov) 'bot move closer
+                if UC(i)>1 then
+                  dazzle_bot(i)
+                else
+                  agro_bot(i,dx,dy,b_hov) 'bot move closer
+                end if
               end if
             end if
-          end if
-        Else  'create a 1-2 seconds delay for the dead robot to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-      Case 5 'hoverbot_drowning
-        UD(i)=(UD(i)+1) Mod 6 'adapt for drowning speed
-        if UD(i)=0 then
-          UA(i)=UA(i)+1
-          if UA(i)>&h8e then UT(i)=0:robot_end
-        end if
-      Case 9 'evilbot chase player
-        If UH(i)>0 Then
-          UD(i)=(UD(i)+1) Mod 2 'adapt for agression level
+          Else  'create a 1-2 seconds delay for the dead robot to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
+          EndIf
+        Case 5 'hoverbot_drowning
+          UD(i)=(UD(i)+1) Mod 6 'adapt for drowning speed
           if UD(i)=0 then
-            if nearx+neary=1 then 'next to player
-              if UH(0)>0 then zap(0) 'show damage to player
-              UH(0)=max(UH(0)-6,0)  'damage player
-            else
-              if UC(i)>1 then
-                if em_on=0 then dazzle_bot(i)
+            UA(i)=UA(i)+1
+            if UA(i)>&h8e then UT(i)=0:robot_end
+          end if
+        Case 9 'evilbot chase player
+          If UH(i)>0 Then
+            UD(i)=(UD(i)+1) Mod 2 'adapt for agression level
+            if UD(i)=0 then
+              if nearx+neary=1 then 'next to player
+                if UH(0)>0 then zap(0) 'show damage to player
+                UH(0)=max(UH(0)-6,0)  'damage player
               else
-                if em_on=0 then agro_bot(i,dx,dy,0) 'bot move closer
+                if UC(i)>1 then
+                  dazzle_bot(i)
+                else
+                  agro_bot(i,dx,dy,0) 'bot move closer
+                end if
               end if
             end if
-          end if
-        Else  'create a 1-2 seconds delay for the dead robot to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-      Case 17 'rollerbot_v
-        If UH(i)>0 Then
-          if UC(i)>1 then
-            if em_on=0 then dazzle_bot(i)
-          else
-            if em_on=0 then walk_bot_v(i,dx,dy,0)
-          end if
-          UB(i)=Max(UB(i)-1,0)
-          If UB(i)=0 And UH(0)>0 Then
-            If dy=0 Then bot_shoot_h(i,dx)
-            If dx=0 Then bot_shoot_v(i,dy)
+          Else  'create a 1-2 seconds delay for the dead robot to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
           EndIf
-        Else  'create a 1-2 seconds delay for the dead body to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-      Case 18 'rollerbot_h
-        If UH(i)>0 Then
-          if UC(i)>1 then
-            if em_on=0 then dazzle_bot(i)
-          else
-            if em_on=0 then walk_bot_h(i,dx,dy,0)
-          end if
-          UB(i)=Max(UB(i)-1,0)
-          If UB(i)=0 And UH(0)>0 Then
-            If dy=0 Then bot_shoot_h(i,dx)
-            If dx=0 Then bot_shoot_v(i,dy)
+        Case 17 'rollerbot_v
+          If UH(i)>0 Then
+            if UC(i)>1 then
+              dazzle_bot(i)
+            else
+              walk_bot_v(i,dx,dy,0)
+            end if
+            UB(i)=Max(UB(i)-1,0)
+            If UB(i)=0 And UH(0)>0 Then
+              If dy=0 Then bot_shoot_h(i,dx)
+              If dx=0 Then bot_shoot_v(i,dy)
+            EndIf
+          Else  'create a 1-2 seconds delay for the dead body to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
           EndIf
-        Else  'create a 1-2 seconds delay for the dead body to vanish
-          inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
-        EndIf
-    End Select
-  Next
+        Case 18 'rollerbot_h
+          If UH(i)>0 Then
+            if UC(i)>1 then
+              dazzle_bot(i)
+            else
+              walk_bot_h(i,dx,dy,0)
+            end if
+            UB(i)=Max(UB(i)-1,0)
+            If UB(i)=0 And UH(0)>0 Then
+              If dy=0 Then bot_shoot_h(i,dx)
+              If dx=0 Then bot_shoot_v(i,dy)
+            EndIf
+          Else  'create a 1-2 seconds delay for the dead body to vanish
+            inc UH(i),-1:if UH(i)<-30 then UT(i)=0:robot_end
+          EndIf
+      End Select
+    Next
+  endif
   
   For i=28 To 31 'tile animations, explosions
     dx=UX(i)-xp:dy=UY(i)-yp
@@ -873,7 +879,7 @@ Sub AI_units
       Case 71 'bomb
         Inc UB(i),-1
         If UB(i)=0 Then
-          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),0,UH(i)) 'do damage UH in radius < UC
           UA(i)=247 'explosion tile
           Play modsample s_dsbarexp,4
         EndIf
@@ -919,7 +925,7 @@ Sub AI_units
         inc UB(i),1
       Case 74 'canister blow or plasma blow
         if UA(i)=247 then 'only once...
-          do_damage(UX(i),UY(i),UC(i),UD(i)) 'do damage UD in radius < UC
+          do_damage(UX(i),UY(i),UC(i),UD(i),UH(i)) 'do damage UH in radius < UC
           Play modsample s_dsbarexp,4
         end if
         Inc UA(i),1  'next tile in explosion sequence
@@ -1235,47 +1241,50 @@ End Sub
   
   
   'applies d damage to all units and objects in a radius
-Sub do_damage(x,y,r,d)
-  Local i,j,a,rr
+Sub do_damage(x,y,r,s,d)
+  Local i,j,a,rr,xm,xp,ym,yp
+  
+  rr=r-1 'tiles only inside radius
+  xm=choice(s=-1,x,x-rr):xp=choice(s=1,x,x+rr)
+  ym=choice(s=-2,y,y-rr):yp=choice(s=2,y,y+rr)
   
   For i=0 To 27 'all units
-    If Abs(UX(i)-x)<r then
-      if Abs(UY(i)-y)<r Then UH(i)=Max(UH(i)-d,0)
+    If UX(i)>=xm And UX(i)<=xp then
+      if UY(i)>=ym And UY(i)<=yp Then UH(i)=Max(UH(i)-d,0) 'do damage
     endif
   Next
   
   For i=48 To 63  'hidden content
-    If Abs(UX(i)-x)<r then
-      if Abs(UY(i)-y)<r Then UT(i)=0 'remove hidden item
+    If UX(i)>=xm And UX(i)<=xp then
+      if UY(i)>=ym And UY(i)<=yp Then UT(i)=0 'remove hidden item
     endif
   Next
   
   'depending the source s result of an explosion differs
-  rr=r-1 'tiles only inside radius
-  For i=-rr To rr
-    For j=-rr To rr
-      a=Asc(Mid$(lv$(y+j),x+i+1,1))
+  For i=xm To xp
+    For j=ym To yp
+      a=Asc(Mid$(lv$(j),i+1,1))
       Select Case a
         case &h80,&H81 'pi-paintings
           'do nothing
         Case &h83
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&h87) 'canister blown
-          If i<>0 Or j<>0 Then blow_canister(x+i,y+j) 'not itself
+          MID$(lv$(j),i+1,1)=Chr$(&h87) 'canister blown
+          If i<>x Or j<>y Then blow_canister(i,j) 'not itself
         Case &h29 'carton box, empty
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&h2A)
+          MID$(lv$(j),i+1,1)=Chr$(&h2A)
         Case &hC7 'wooden box, empty
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&hC6)
+          MID$(lv$(j),i+1,1)=Chr$(&hC6)
         Case &h2D 'small box, empty
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&h2E)
+          MID$(lv$(j),i+1,1)=Chr$(&h2E)
         Case &hCD 'bridge. empty
-          MID$(lv$(y+j),i+x+1,1)=Chr$(&hCC)
+          MID$(lv$(j),i+1,1)=Chr$(&hCC)
         case <&hCD 'indoor plant or empty boxes -> destroy
-          if (get_ta(x+i,y+j) And b_dmg) then
-            MID$(lv$(y+j),i+x+1,1)=Chr$(9)
+          if (get_ta(i,j) And b_dmg) then
+            MID$(lv$(j),i+1,1)=Chr$(9)
           end if
         case >&hCD 'outdoor -> destroy
-          if (get_ta(x+i,y+j) And b_dmg) then
-            MID$(lv$(y+j),i+x+1,1)=Chr$(&hD0)
+          if (get_ta(i,j) And b_dmg) then
+            MID$(lv$(j),i+1,1)=Chr$(&hD0)
           end if
       End Select
     Next
@@ -1306,10 +1315,10 @@ end sub
   
   
   'starts animation showing explosion
-sub explosion(i)
+sub explosion(i,s)
   if pl_wp=2 then 'plasma explosion 11 dmg radius 2
     Local j=findslot()
-    If j<32 Then UT(j)=74:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247:UB(j)=24:UC(j)=3:UD(j)=11
+    If j<32 Then UT(j)=74:UX(j)=UX(i):UY(j)=UY(i):UA(j)=247:UB(j)=24:UC(j)=3:UD(j)=s:UH(j)=11
   else
     small_explosion(i) 'pistol explosion
   end if
@@ -1401,7 +1410,7 @@ Sub fire_ew(p)
         
         j=has_unit(UX(i),UY(i))
         If j<255 Then 'if robot then damage it
-          explosion(i)
+          explosion(i,0)
           if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
@@ -1412,13 +1421,13 @@ Sub fire_ew(p)
           
         elseif typ=&h81 Then 'vertical pi-sign
           Mid$(lv$(yp),xip+1,1)=chr$(8)
-          explosion(i)
+          explosion(i,p)
           Inc x,-p:Exit
           
         ElseIf (t And (b_see+b_wlk+b_hov)) Then  'pass fire, next tile
           
         Else'If (t And (b_see))=0 Then  'stopped by wall
-          explosion(i)
+          explosion(i,p)
           Inc x,-p:Exit
           
         EndIf
@@ -1467,7 +1476,7 @@ Sub fire_ns(p)
         
         j=has_unit(UX(i),UY(i))
         If j<255 Then 'if robot then damage it
-          explosion(i)
+          explosion(i,0)
           if pl_wp=1 then Inc UH(j),-1
           if UT(j)<4 then UT(j)=4 'hoverbot become aggressive
           Inc x,-p:Exit
@@ -1475,16 +1484,16 @@ Sub fire_ns(p)
         ElseIf typ=&h83 Then 'canister
           blow_canister(xp,yip)
           Inc y,-p:Exit
-
+          
         ElseIf typ=&h80 Then 'horizontal pi-sign
           Mid$(lv$(yip),xp+1,1)=chr$(5)
-          explosion(i)
+          explosion(i,2*p)
           Inc y,-p:Exit
           
         ElseIf (t And (b_see+b_wlk+b_hov)) Then   'pass fire, next tile
           
         Else'If (t And (b_see))=0 Then  'stopped by wall
-          explosion(i)
+          explosion(i,2*p)
           Inc y,-p:Exit
           
         EndIf
@@ -1924,7 +1933,7 @@ Sub show_intro
         play modsample s_beep-2,4
         If k$="down" Then Inc MS,(MS<4)
         If k$="up" Then Inc MS,-(MS>1)
-        If InStr("use-item,start,fire-a", k$) Then
+        If InStr("use-item,fire-a", k$) Then
           Select Case MS
             Case 1
               FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
@@ -1942,7 +1951,7 @@ Sub show_intro
                     Inc Map_Nr,-(Map_Nr>0)
                   ElseIf k$="right" Then
                     Inc Map_Nr,(Map_Nr<13)
-                  ElseIf InStr("use-item,start,fire-a", k$) Then
+                  ElseIf InStr("use-item,fire-a", k$) Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
                   Text 9,70,"                "
@@ -1961,7 +1970,7 @@ Sub show_intro
                 k$=read_input$()
                 If k$<>"" Then
                   play modsample s_beep-2,4
-                  If InStr("use-item,start,fire-a", k$) Then
+                  If InStr("use-item,fire-a", k$) Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
                     Exit
@@ -2095,6 +2104,15 @@ Function init_controller$()
       Case Else
         Error "Unsupported platform: " + platform$
     End Select
+    
+    ctrl_gamemite$ = s$
+    Exit Function
+  Else
+    ' Initialise GP8-GP15 as digital inputs with PullUp resistors
+    Local i
+    For i = 8 To 15
+      SetPin MM.Info(PinNo "GP" + Str$(i)), Din, PullUp
+    Next
   EndIf
   ctrl$ = str.replace$(ctrl$, "-", "_")
   init_controller$ = "ctrl_" +  ctrl$ + "$"
@@ -2105,17 +2123,17 @@ End Function
   
   
   ' Dummy controller driver.
-Function ctrl_none$(mode%)
-  If mode% = 2 Then ctrl_none$ = "Keyboard"
+Function ctrl_none$(mode)
+  If mode = 2 Then ctrl_none$ = "Keyboard"
 End Function
   
   
   ' Controller driver for Game*Mite.
-Function ctrl_gamemite$(mode%)
-  If Not mode% Then
-    Local bits% = Inv Port(GP8, 8) And &hFF, s$
+Function ctrl_gamemite$(mode)
+  If Not mode Then
+    Local bits = Inv Port(GP8, 8) And &hFF, s$
     
-    Select Case bits%
+    Select Case bits
         Case 0    : Exit Function
         Case &h01 : s$ = "down"
         Case &h02 : s$ = "left"
@@ -2137,30 +2155,30 @@ Function ctrl_gamemite$(mode%)
     
     ctrl_gamemite$ = s$
     Exit Function
-  ElseIf mode% = 1 Then
+  ElseIf mode = 1 Then
     ' Initialise GP8-GP15 as digital inputs with PullUp resistors
-    Local i%
-    For i% = 8 To 15
-      SetPin MM.Info(PinNo "GP" + Str$(i%)), Din, PullUp
+    Local i
+    For i = 8 To 15
+      SetPin MM.Info(PinNo "GP" + Str$(i)), Din, PullUp
     Next
-  ElseIf mode% = 2 Then
+  ElseIf mode = 2 Then
     ctrl_gamemite$ = "Game*Mite"
   EndIf
 End Function
   
   
   ' Controller driver for NES gamepad connected to PicoGAME VGA port A.
-Function ctrl_nes_a$(mode%)
-  If Not mode% Then
-    Local bits%, i%, s$
+Function ctrl_nes_a$(mode)
+  If Not mode Then
+    Local bits, i, s$
     
     Pulse NES_A_LATCH, NES_PULSE!
-    For i% = 0 To 7
-      If Not Pin(NES_A_DATA) Then bits%=bits% Or 2^i%
+    For i = 0 To 7
+      If Not Pin(NES_A_DATA) Then bits=bits Or 2^i
       Pulse NES_A_CLOCK, NES_PULSE!
     Next
     
-    Select Case bits%
+    Select Case bits
         Case 0    : Exit Function
         Case &h01 : s$ = "fire-a"        ' Fire A
         Case &h03 : s$ = "quit"          ' Fire A + Fire B
@@ -2182,29 +2200,29 @@ Function ctrl_nes_a$(mode%)
     
     ctrl_nes_a$ = s$
     Exit Function
-  ElseIf mode% = 1 Then
+  ElseIf mode = 1 Then
     SetPin NES_A_DATA, DIn
     SetPin NES_A_LATCH, DOut
     SetPin NES_A_CLOCK, DOut
     SetPin GP14, DOut
     Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
-  ElseIf mode% = 2 Then
+  ElseIf mode = 2 Then
     ctrl_nes_a$ = "NES Gamepad A"
   EndIf
 End Function
   
   
   ' Controller driver for Atari joystick connected to PicoGAME VGA port A.
-Function ctrl_atari_a$(mode%)
-  If Not mode% Then
-    Local bits%, s$
-    Inc bits%, Not Pin(GP14)       ' Fire
-    Inc bits%, Not Pin(GP0) * &h02 ' Up
-    Inc bits%, Not Pin(GP1) * &h04 ' Down
-    Inc bits%, Not Pin(GP2) * &h08 ' Left
-    Inc bits%, Not Pin(GP3) * &h10 ' Right
+Function ctrl_atari_a$(mode)
+  If Not mode Then
+    Local bits, s$
+    Inc bits, Not Pin(GP14)       ' Fire
+    Inc bits, Not Pin(GP0) * &h02 ' Up
+    Inc bits, Not Pin(GP1) * &h04 ' Down
+    Inc bits, Not Pin(GP2) * &h08 ' Left
+    Inc bits, Not Pin(GP3) * &h10 ' Right
     
-    Select Case bits%
+    Select Case bits
         Case 0    : Exit Function
         Case &h01 : s$ = "fire-a"
         Case &h02 : s$ = "up"
@@ -2219,12 +2237,13 @@ Function ctrl_atari_a$(mode%)
     
     ctrl_atari_a$ = s$
     Exit Function
-  ElseIf mode% = 1 Then
+  ElseIf mode = 1 Then
     SetPin GP0, DIn : SetPin GP1, DIn : SetPin GP2, DIn : SetPin GP3, DIn : SetPin GP14, DIn
-  ElseIf mode% = 2 Then
+  ElseIf mode = 2 Then
     ctrl_atari_a$ = "Atari Joystick A"
   EndIf
 End Function
+
 
 Function quit_keys$()
   Select Case CTRL_DRIVER$
@@ -2232,8 +2251,9 @@ Function quit_keys$()
     Case Else : quit_keys$ = "ESCAPE"
   End Select
 End Function
-  
-  ' Use a function to save 256 bytes of heap that a string would take.
+
+
+    ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
   Select Case Mm.Info(path)
       Case "", "NONE" : path$ = Cwd$
