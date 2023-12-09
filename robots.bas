@@ -2220,7 +2220,7 @@ Function ctrl_wii_classic$(init)
       End Select
     EndIf
     
-    ctrl_wiiclassic$ = s$
+    ctrl_wii_classic$ = s$
     Exit Function
   Else
     Device Wii Open
