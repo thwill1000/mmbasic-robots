@@ -262,18 +262,18 @@
       
     EndIf 'pl_md<p_death
     
-    If k$ = "escape" Then
+    If k$ = "quit" Then
       writecomment("PAUSE, press <ESC> to quit")
       kill_kb
       do
         pause 100:k$=read_input$()
       loop while k$=""
-      If k$ <> "escape" Then k$="" : writecomment("continue") 'any value that does not quit
+      If k$ <> "quit" Then k$="" : writecomment("continue") 'any value that does not quit
     end if
     
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     
-  Loop Until k$ = "escape"   'quit when <esc> is pressed
+  Loop Until k$ = "quit"   'quit when <esc> is pressed
   
   game_end
   If LCD_DISPLAY Then FrameBuffer Copy f,n
@@ -932,7 +932,7 @@ Sub AI_units
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
             if dx=0 And dy=0 then
               if UC(i)=0 then
-                k$ = "escape" 'force game over by simulate pressing ESC
+                k$ = "quit" 'force game over by simulate pressing ESC
               else
                 xp=UC(i):yp=UD(i) 'transport player
               end if
@@ -2053,7 +2053,7 @@ Function read_inkey$()
   Select Case Asc(Inkey$)
       Case 0   : Exit Function
       Case 9   : read_inkey$ = "map"          ' Tab
-      Case 27  : read_inkey$ = "escape"
+      Case 27  : read_inkey$ = "quit"
       Case 32  : read_inkey$ = "use-item"     ' Space
       Case 77  : read_inkey$ = "toggle-music" ' M
       Case 97  : read_inkey$ = "fire-left"    ' a
@@ -2092,7 +2092,7 @@ Function ctrl_gamemite$(init)
         Case &h02 : s$ = "left"
         Case &h04 : s$ = "up"
         Case &h08 : s$ = "right"
-        Case &h10 : s$ = "escape"        ' Select
+        Case &h10 : s$ = "quit"          ' Select
         Case &h20 : s$ = "use-item"      ' Start
         Case &h40 : s$ = "search"        ' Fire B
         Case &h41 : s$ = "toggle-item"   ' Down + Fire B
@@ -2133,7 +2133,7 @@ Function ctrl_nes_a$(init)
         Case &h01 : s$ = "move"          ' Fire A
         Case &h02 : s$ = "search"        ' Fire B
         Case &h03 : s$ = "map"           ' Fire A + Fire B
-        Case &h04 : s$ = "escape"        ' Select
+        Case &h04 : s$ = "quit"          ' Select
         Case &h08 : s$ = "use-item"      ' Start
         Case &h10 : s$ = "up"
         Case &h11 : s$ = "fire-up"       ' Up + Fire A
@@ -2199,7 +2199,7 @@ Function ctrl_wii_classic$(init)
           Case &h0001 : s$ = "toggle-item"   ' R shoulder button
           Case &h0002 : s$ = "use-item"      ' Start
           Case &h0004 : s$ = "map"           ' Home
-          Case &h0008 : s$ = "escape"        ' Select
+          Case &h0008 : s$ = "quit"          ' Select
           Case &h0010 : s$ = "toggle-weapon" ' L shoulder button
           Case &h0020 : s$ = "fire-down"     ' Cursor down
           Case &h0040 : s$ = "fire-right"    ' Cursor right
