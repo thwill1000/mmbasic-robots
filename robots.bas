@@ -1991,9 +1991,15 @@ Sub show_intro
 End Sub
   
   
-  'remove duplicate keys and key repeat
-Sub flush_input
-  Do While read_input$() <> "" : Loop
+  ' Reads from keyboard and controller until no keys/buttons are down.
+  ' Doesn't call read_input$() because that has special handling that
+  ' can return the empty-string even if a key/button is down.
+Sub flush_input()
+  Local k$
+  Do
+    k$ = read_inkey$()
+    If k$ = "" Then k$ = Call(CTRL_DRIVER$)
+  Loop Until k$ = ""
 End Sub
   
   
