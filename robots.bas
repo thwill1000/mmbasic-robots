@@ -1893,118 +1893,117 @@ Sub show_intro
   Sprite 28,18,28,10,88,24:Box 32,21,80,34,,0,0
   
   FRAMEBUFFER write l: fade_in: :FRAMEBUFFER write sc$
-  Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
-  Local Message$(4) length 40
+  Local puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1)
+  Local flip, mt, ms = 1, t
+  Const FOOTER$ = "       Use UP & DOWN, Space/START       "
   
   'set Map to 0, Menu State to 1
-  Message$(1)="       Use UP & DOWN, Space/START       "
-  Message$(2)="      Use LEFT & RIGHT, Space/START     "
-  Message$(3)="      Use LEFT & RIGHT, Space/START     "
-  dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
-  Map_Nr=0:MS=1:Difficulty=1
+  Map_Nr=0
   
   ' start playing the intro Music
   Play Modfile path$("music/metal_heads-sfx.mod")
-  show_menu 1
   
   'Display Map Name
   Text 9,70,UCase$(map_nam$(Map_Nr))
   
   '--- copyright notices etc
-  Text 0,224,Message$(1),,,,col(3)
-  Local msg$ = String$(36,32)
-  Cat msg$, Call(CTRL_DRIVER$, 2) + " - "
+  Text 0,224,FOOTER$
   Cat msg$, "Original game by David Murray - "
   Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
   Cat msg$, "Graphics by Piotr Radecki - "
   Cat msg$, "Music by Noelle Aman - "
   Cat msg$, "MMBasic by Geoff Graham & Peter Mather "
-  flip=0
-  MT=0
   
   'check player choice
   kill_kb
   Do
-    If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
-    tp$=Mid$(msg$,1+MT,41)
-    if t2=0 then 'once every 4 cycles
-      k$=read_input$()
-      If k$<>"" Then
-        play modsample s_beep-2,4
-        If k$="down" Then Inc MS,(MS<4)
-        If k$="up" Then Inc MS,-(MS>1)
-        If InStr("use-item,fire-a", k$) Then
-          Select Case MS
-            Case 1
-              FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
-              Exit 'intro and go on with the Program
-            Case 2
-              'select map
-              kill_kb
-              Text 0,224,message$(2),,,,col(3)
-              If LCD_DISPLAY Then FrameBuffer Merge 9,b
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  play modsample s_beep-2,4
-                  If k$="left" Then
-                    Inc Map_Nr,-(Map_Nr>0)
-                  ElseIf k$="right" Then
-                    Inc Map_Nr,(Map_Nr<13)
-                  ElseIf InStr("use-item,fire-a", k$) Then
-                    Text 0,224,message$(1),,,,col(3): Exit
-                  EndIf
-                  Text 9,70,"                "
-                  Text 9,70,UCase$(map_nam$(Map_Nr))
-                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
-                  Pause 200
-                EndIf
-              Loop
-              kill_kb
-            Case 3
-              'select DIFFICULTY
-              kill_kb
-              Text 0,224,message$(3),,,,col(3)
-              If LCD_DISPLAY Then FrameBuffer Merge 9,b
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  play modsample s_beep-2,4
-                  If InStr("use-item,fire-a", k$) Then
-                    Text 0,224,message$(1),,,,col(3)
-                    Text 0,232,"      "
-                    Exit
-                  ElseIf k$="left" Then
-                    Inc Diff_Level,-(Diff_Level>0)
-                  ElseIf k$="right" Then
-                    Inc Diff_Level,(Diff_Level<2)
-                  EndIf
-                  Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
-                  Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
-                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
-                  Pause 200
-                EndIf
-              Loop
-              kill_kb
-            Case 4
-              'select CONTROLS
-          End Select
-        EndIf
-      endif
-    EndIf
-    
-    show_menu MS,col(puls(t))
-    
-    Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) And 3
-    Inc t: t=t Mod 12 'color change
-    inc t2: t2=t2 mod 3 'reponse time keys
+    show_menu ms,col(puls(t))
+    Text 8-(2*flip),0,Mid$(msg$,1+mt,41),,,,col(2)
+    flip=(flip+1) Mod 4
+    If flip=0 Then Inc mt
+    If mt>Len(msg$) Then mt=0
+    t=(t + 1) Mod Bound(puls(), 1) 'color change
+
+    k$=read_input$(1)
+    If k$<>"" Then play modsample s_beep-2,4
+    Select Case k$
+      Case "down"
+        Inc MS,(MS<4)
+      Case "up"
+        Inc MS,-(MS>1)
+      Case "use-item", "fire-a"
+        Select Case MS
+          Case 1
+            Exit Do
+          Case 2
+            select_map()
+            Text 0,224,FOOTER$
+          Case 3
+            select_difficulty()
+            Text 0,224,FOOTER$
+          Case 4
+            'select CONTROLS
+        End Select
+    End Select
+
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     Pause 50
   Loop
+
+  FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
   Play stop
 End Sub
-  
-  
+
+
+Sub select_map()
+  Local update = 1
+  Text 0,224,"      Use LEFT & RIGHT, Space/START     ",,,,col(3)
+  Do
+    If update Then
+      Text 9,70,UCase$(map_nam$(Map_Nr))
+      If LCD_DISPLAY Then FrameBuffer Merge 9,b
+      update = 0
+    EndIf
+    Pause 50
+
+    k$=read_input$(1)
+    If k$<>"" Then play modsample s_beep-2,4
+    Select Case k$
+      Case "left": Inc Map_Nr,-(Map_Nr>0) : update = 1
+      Case "right": Inc Map_Nr,(Map_Nr<13) : update = 1
+      Case "use-item", "fire-a": Exit Do
+    EndIf
+  Loop
+End Sub
+
+
+Sub select_difficulty()
+  Local DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
+  kill_kb
+  Text 0,224,"      Use LEFT & RIGHT, Space/START     ",,,,col(3)
+  If LCD_DISPLAY Then FrameBuffer Merge 9,b
+  Do
+    k$=read_input$(1)
+    If k$<>"" Then
+      play modsample s_beep-2,4
+      If InStr("use-item,fire-a", k$) Then
+        Text 0,232,"      "
+        Exit Do
+      ElseIf k$="left" Then
+        Inc Diff_Level,-(Diff_Level>0)
+      ElseIf k$="right" Then
+        Inc Diff_Level,(Diff_Level<2)
+      EndIf
+      Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
+      Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
+      If LCD_DISPLAY Then FrameBuffer Merge 9,b
+      Pause 200
+    EndIf
+  Loop
+  kill_kb
+End Sub
+
+
   'remove duplicate keys and key repeat
 Sub kill_kb
   Do While read_input$() <> "" : Loop
@@ -2046,11 +2045,12 @@ Sub fade_out
   Next
 End Sub
   
-Function read_input$()
+Function read_input$(z%)
   Static last$
   read_input$ = read_inkey$()
-  If Len(read_input$) Then Exit Function
-  read_input$ = Call(CTRL_DRIVER$)
+  If read_input$ = "" Then read_input$ = Call(CTRL_DRIVER$)
+  If read_input$ = "" Then last$ = "" : Exit Function
+  If z% And last$ <> "" Then read_input$ = "" : Exit Function
 
   ' Suppress auto-repeat except for movement.
   If last$ = read_input$ Then
@@ -2104,15 +2104,6 @@ Function init_controller$()
       Case Else
         Error "Unsupported platform: " + platform$
     End Select
-    
-    ctrl_gamemite$ = s$
-    Exit Function
-  Else
-    ' Initialise GP8-GP15 as digital inputs with PullUp resistors
-    Local i
-    For i = 8 To 15
-      SetPin MM.Info(PinNo "GP" + Str$(i)), Din, PullUp
-    Next
   EndIf
   ctrl$ = str.replace$(ctrl$, "-", "_")
   init_controller$ = "ctrl_" +  ctrl$ + "$"
@@ -2318,10 +2309,11 @@ colors:
   
   '
 map_names:
-  Data "01-research lab","02-headquarters","03-the village","04-the islands"
-  Data "05-downtown","06-pi university","07-more islands","08-robot hotel"
-  Data "09-forest moon","10-death tower","11-river death","12-bunker"
-  Data "13-castle robot","14-rocket center"
+  Data "01-research lab ", "02-headquarters ", "03-the village  "
+  Data "04-the islands  ", "05-downtown     ", "06-pi university"
+  Data "07-more islands ", "08-robot hotel  ", "09-forest moon  "
+  Data "10-death tower  ", "11-river death  ", "12-bunker       "
+  Data "13-castle robot ", "14-rocket center"
   
   ' C64_PetsciiRobotsFont  Martin Herhaus
   ' Font type    : Full (96 Characters)
