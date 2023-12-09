@@ -1944,7 +1944,7 @@ Sub show_intro
         play modsample s_beep-2,4
         If k$="down" Then Inc MS,(MS<4)
         If k$="up" Then Inc MS,-(MS>1)
-        If InStr("use-item,move", k$) Then
+        If InStr("fire-a,use-item,move", k$) Then
           Select Case MS
             Case 1
               FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
@@ -1959,7 +1959,7 @@ Sub show_intro
                   play modsample s_beep-2,4
                   If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
                   If k$="right" Then Inc Map_Nr,(Map_Nr<13)
-                  If InStr("use-item,move", k$) Then
+                  If InStr("fire-a,use-item,move", k$) Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
                   Text 9,70,"                "
@@ -1977,7 +1977,7 @@ Sub show_intro
                 k$=read_input$()
                 If k$<>"" Then
                   play modsample s_beep-2,4
-                  If InStr("use-item,move", k$) Then
+                  If InStr("fire-a,use-item,move", k$) Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
                     Exit
@@ -2121,17 +2121,18 @@ Function ctrl_gamemite$(init)
         Case &h02 : s$ = "left"
         Case &h04 : s$ = "up"
         Case &h08 : s$ = "right"
-        Case &h10 : s$ = "quit"          ' Select
+        Case &h10 : s$ = "map"           ' Select
         Case &h20 : s$ = "use-item"      ' Start
-        Case &h40 : s$ = "search"        ' Fire B
         Case &h41 : s$ = "toggle-item"   ' Down + Fire B
+        Case &h42 : s$ = "search"        ' Left + Fire B
         Case &h44 : s$ = "toggle-weapon" ' Up + Fire B
-        Case &h80 : s$ = "move"          ' Fire A
+        Case &h48 : s$ = "move"          ' Right + Fire B
+        Case &h80 : s$ = "fire-a"
         Case &h81 : s$ = "fire-down"     ' Down + Fire A
         Case &h82 : s$ = "fire-left"     ' Left + Fire A
         Case &h84 : s$ = "fire-up"       ' Up + Fire A
         Case &h88 : s$ = "fire-right"    ' Right + Fire A
-        Case &hC0 : s$ = "map"           ' Fire A + Fire B
+        Case &hC0 : s$ = "quit"          ' Fire A + Fire B
     End Select
     
     ctrl_gamemite$ = s$
@@ -2260,7 +2261,8 @@ End Function
 
 Function quit_keys$()
   Select Case CTRL_DRIVER$
-    Case "ctrl_gamemite$", "ctrl_nes_a$", "ctrl_wii_classic" : quit_keys$ = "SELECT"
+    Case "ctrl_gamemite$" : quit_keys$ = "A+B"
+    Case "ctrl_nes_a$", "ctrl_wii_classic" : quit_keys$ = "SELECT"
     Case Else : quit_keys$ = "ESCAPE"
   End Select
 End Function
