@@ -85,7 +85,7 @@
   ani_timer=1             'world animations
   writeworld_n(xm,ym)     'initialwold
   writecomment("Welcome to PETSCII Robots")
-  writecomment("Find and kill "+str$(start_bots)+" robots")
+  writecomment("Find and destroy "+str$(start_bots)+" robots")
   framebuffer write L:fade_in:framebuffer write sc$
   
   'game play variables
