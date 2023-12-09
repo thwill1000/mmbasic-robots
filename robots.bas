@@ -1921,7 +1921,7 @@ Sub show_intro
         play modsample s_beep-2,4
         If k$="down" Then Inc MS,(MS<4)
         If k$="up" Then Inc MS,-(MS>1)
-        If k$="use-item" Then
+        If InStr("use-item,move", k$) Then
           Select Case MS
             Case 1
               FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
@@ -1936,7 +1936,7 @@ Sub show_intro
                   play modsample s_beep-2,4
                   If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
                   If k$="right" Then Inc Map_Nr,(Map_Nr<13)
-                  If k$="use-item" Then
+                  If InStr("use-item,move", k$) Then
                     Text 0,224,message$(1),,,,col(3): Exit
                   EndIf
                   Text 9,70,"                "
@@ -1954,7 +1954,7 @@ Sub show_intro
                 k$=read_input$()
                 If k$<>"" Then
                   play modsample s_beep-2,4
-                  If k$="use-item" Then
+                  If InStr("use-item,move", k$) Then
                     Text 0,224,message$(1),,,,col(3)
                     Text 0,232,"      "
                     Exit
@@ -2177,6 +2177,7 @@ Function ctrl_atari_a$(init)
     
     Select Case bits
         Case 0    : Exit Function
+        Case &h01 : s$ = "move"
         Case &h02 : s$ = "up"
         Case &h03 : s$ = "fire-up"
         Case &h04 : s$ = "down"
