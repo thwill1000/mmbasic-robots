@@ -270,7 +270,8 @@
     EndIf 'pl_md<p_death
     
     If k$ = "quit" Then
-      writecomment("PAUSE, press <ESC> to quit")
+      writecomment("PAUSE, press " + quit_keys$() + " to quit")
+      If LCD_DISPLAY Then FrameBuffer Merge 9,b
       flush_input
       do
         pause 100:k$=read_input$()
@@ -280,7 +281,7 @@
     
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     
-  Loop Until k$ = "quit"   'quit when <esc> is pressed
+  Loop Until k$ = "quit"
   
   game_end
   If LCD_DISPLAY Then FrameBuffer Copy f,n
@@ -457,7 +458,7 @@ Sub game_over
   Box xs-32,ys,88,24,1,textc,bckgnd
   Text xs-24,ys+8,"GAME OVER",,,,textc,bckgnd
   pl_md=p_death
-  framebuffer write sc$:writecomment("press <ESC>"):framebuffer write l
+  framebuffer write sc$:writecomment("Press " + quit_keys$()):framebuffer write l
 End Sub
   
   
@@ -939,7 +940,7 @@ Sub AI_units
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
             if dx=0 And dy=0 then
               if UC(i)=0 then
-                k$ = "quit" 'force game over by simulate pressing ESC
+                k$ = "quit" 'force game over by simulating quit
               else
                 xp=UC(i):yp=UD(i) 'transport player
               end if
@@ -2240,7 +2241,14 @@ Function ctrl_wii_classic$(init)
     Device Wii Open
   EndIf
 End Function
-  
+
+
+Function quit_keys$()
+  Select Case CTRL_DRIVER$
+    Case "ctrl_gamemite$", "ctrl_nes_a$", "ctrl_wii_classic" : quit_keys$ = "SELECT"
+    Case Else : quit_keys$ = "ESCAPE"
+  End Select
+End Function
   
   ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
