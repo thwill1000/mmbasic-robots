@@ -189,6 +189,7 @@
             pl_mk=100                     'full medkit
           end if
         Case "map" 'TAB key show map + toggle player/robots
+          Play ModSample s_beep, 4
           Select Case map_mode
             Case 0
               map_mode=1      'stop showing normal mode
@@ -202,6 +203,12 @@
               map_mode=0
               FRAMEBUFFER write l:CLS  col(5):FRAMEBUFFER write sc$ 'clear layer
               writeplayer(hp,vp,pl_wp)
+          End Select
+          Select Case map_mode
+            Case 0: writecomment("Map deactivated")
+            Case 1: writecomment("Map activated")
+            Case 2: writecomment("Map displaying robots")
+            Case 3: writecomment("Map displaying objects")
           End Select
       End Select
       
