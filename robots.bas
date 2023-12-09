@@ -264,7 +264,7 @@
     
     If k$ = "quit" Then
       writecomment("PAUSE, press <ESC> to quit")
-      kill_kb
+      flush_input
       do
         pause 100:k$=read_input$()
       loop while k$=""
@@ -593,7 +593,7 @@ Sub target_move
   hm=h:vm=v                   'global for use later
   If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
     sprite_item(&h55,24*h+xs,24*v+ys)
-    kill_kb
+    flush_input
   Else
     writecomment("Object cannot be moved")
     Play modsample s_error,4
@@ -1911,7 +1911,7 @@ Sub show_intro
   MT=0
   
   'check player choice
-  kill_kb
+  flush_input
   Do
     If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
     tp$=Mid$(msg$,1+MT,41)
@@ -1928,7 +1928,7 @@ Sub show_intro
               Exit 'intro and go on with the Program
             Case 2
               'select map
-              kill_kb
+              flush_input
               Text 0,224,message$(2),,,,col(3)
               Do
                 k$=read_input$()
@@ -1945,10 +1945,10 @@ Sub show_intro
                 EndIf
                 Pause 200
               Loop
-              kill_kb
+              flush_input
             Case 3
               'select DIFFICULTY
-              kill_kb
+              flush_input
               Text 0,224,message$(3),,,,col(3)
               Do
                 k$=read_input$()
@@ -1971,7 +1971,7 @@ Sub show_intro
                 EndIf
                 Pause 200
               Loop
-              kill_kb
+              flush_input
             Case 4
               'select CONTROLS
           End Select
@@ -1992,7 +1992,7 @@ End Sub
   
   
   'remove duplicate keys and key repeat
-Sub kill_kb
+Sub flush_input
   Do While read_input$() <> "" : Loop
 End Sub
   
