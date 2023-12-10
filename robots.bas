@@ -2,6 +2,8 @@
   
   Option default Integer
   
+  Dim VERSION$ Length 8 = "25p-sp-1"
+
   ' system setup -----------------------------------------------------
   
   Const NES_A_DATA = Mm.Info(PinNo GP1)
@@ -1910,11 +1912,12 @@ Sub show_intro
   '--- copyright notices etc
   Text 0,224,Message$(1),,,,col(3)
   Local msg$ = String$(36,32)
-  '  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
-  Cat msg$, "Original Game by David Murray - "
-  Cat msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
-  Cat msg$, "Community - Music by Noelle Aman, Graphic by "
-  Cat msg$, "Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
+  Cat msg$, "Version " + VERSION$ + " - "
+  Cat msg$, "Original game by David Murray - "
+  Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
+  Cat msg$, "Graphics by Piotr Radecki - "
+  Cat msg$, "Music by Noelle Aman - "
+  Cat msg$, "MMBasic by Geoff Graham & Peter Mather "
   flip=0
   MT=0
   
