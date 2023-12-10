@@ -13,6 +13,7 @@
   
   Const LCD_DISPLAY = Mm.Device$ = "PicoMite"
   Const SC$ = Choice(LCD_DISPLAY, "f", "n")
+  Const MOD_BUFF_128K = 1 ' Set true if using smaller/128K mod buffer.
   
   Dim CTRL_DRIVER$ = Choice(LCD_DISPLAY, "ctrl_gamemite$", "ctrl_none$")
   ' Uncomment one of these to override controller:
@@ -1745,19 +1746,24 @@ End Sub
   
   
 sub select_music(a)
-  Play stop
-  select case a
-    case 0
-      Play modfile path$("music/get_psyched-sfx.mod")   'sfx combined with music
-    case 1
-      Play modfile path$("music/sfcmetallicbop2.mod")   'sfx combined with music
-    case 2
-      Play modfile path$("music/rushin_in-sfx.mod")     'sfx combined with music
-    case 3
-      Play modfile path$("music/petsciisfx.mod")        'only sfx
-  end select
+  Local f$
+  If MOD_BUFF_128K Then
+    Select Case a
+      Case 0, 1: f$ = "sfcmetallicbop2.mod"
+      Case 2:    f$ = "rushin_in-sfx-c.mod"
+      Case 3:    f$ = "petsciisfx.mod"
+    End Select
+  Else
+    Select Case a
+      Case 0: f$ = "get_psyched-sfx.mod"
+      Case 1: f$ = "sfcmetallicbop2.mod"
+      Case 2: f$ = "rushin_in-sfx.mod"
+      Case 3: f$ = "petsciisfx.mod"
+    End Select
+  EndIf
+  Play Stop
+  Play ModFile path$("music/" + f$)
 end sub
-  
   
   
   ' subs for game setup -------------------------------------------------
