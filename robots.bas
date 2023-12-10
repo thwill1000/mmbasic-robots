@@ -2,7 +2,7 @@
   
   Option default Integer
   
-  Dim VERSION$ Length 8 = "RC1-sp"
+  Dim VERSION$ Length 8 = "RC2-sp"
 
   ' system setup -----------------------------------------------------
   
