@@ -608,7 +608,7 @@ Sub place_bomb
   'UA()=sprite,UB()=delay in loops (3 sec),UC()=radius,UD()=damage
   Local i=findslot()
   If i<32 Then
-    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=30:UC(i)=3:UD(i)=11
+    UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=30:UC(i)=3:UH(i)=11
     Inc pl_bo,-1:show_item
     writecomment("you placed a bomb")
   EndIf
