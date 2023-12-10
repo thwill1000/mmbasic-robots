@@ -1,4 +1,4 @@
-  'petrobot testbed picomite VGA V50708RC17 or later
+  'PETSCII ROBOTS for PicoMiteVGA needs MMBasic V50800b4 or later
   
   Option default Integer
   
@@ -41,9 +41,11 @@
   statistics(start_bots,start_hidden) 'to calculate end screen
   loadgraphics
   
+  
   'adapt hoverbots for difficulty level
   if Diff_level=2 then
-    for i=1 to 27: UT(i)=4*(UT(i)<4):next 'aggro all hoverbots
+      for i=1 to 27: if UT(i)=2 or UT(i)=3 then UT(i)=4
+    next 'aggro all hoverbots
   end if
   
   
@@ -137,7 +139,7 @@
           Case p_w
             If (get_ta(xp+h,yp+v) And b_wlk) Then 'check if we can walk, then walk
               if has_unit(xp+h,yp+v)=255 then
-                xp=xp+h:yp=yp+v               'new player position
+                inc xp,h:inc yp,v             'new player position
                 xp=Min(Max(xp,5),hsize-6)     'don't fall off the map
                 yp=Min(Max(yp,3),vsize-4)
                 UX(unit)=x:UY(unit)=y         'store pos for future use
@@ -195,9 +197,9 @@
               FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
               renderLiveMap   'show map mode
             Case 1
-              if diff_level<2 then map_mode=2 else map_mode=0
+              map_mode=Choice(diff_level<2,2,0)
             Case 2
-              if diff_level<1 then map_mode=3 else map_mode=0
+              map_mode=Choice(diff_level<1,3,0)
             Case 3
               map_mode=0
               FRAMEBUFFER write l:CLS  col(5):FRAMEBUFFER write sc$ 'clear layer
@@ -320,7 +322,7 @@ Sub writesprites_l
               Else
                 Sprite memory sprite_index(UA(i)),xs,ys,9
                 h_beat=min(h_beat+40,400):
-                Inc UA(i),1 'slow down all, next sprite
+                Inc UA(i) 'slow down all, next sprite
               EndIf
             EndIf
           Case 2,3,4
@@ -568,7 +570,7 @@ End Sub
 Sub anim_viewer
   Static p
   If p=0 Then v1=v:h1=h:v2=30*v1+ys:h2=30*h1+xs
-  Inc p,1
+  Inc p
   
   'use v2 and h2 to determine the search area
   Select Case p
@@ -862,7 +864,7 @@ Sub AI_units
     nearx=Abs(dx):neary=Abs(dy)
     Select Case UT(i)
       Case 11 'small explosion
-        Inc UA(i),1:If UA(i)=253 Then UT(i)=0 'done exploding
+        Inc UA(i):If UA(i)=253 Then UT(i)=0 'done exploding
       Case 71 'bomb
         Inc UB(i),-1
         If UB(i)=0 Then
@@ -872,7 +874,7 @@ Sub AI_units
         EndIf
         If UB(i)<0 Then
           xof=4-xof:xs=5*24 - xof 'shake screen
-          Inc UA(i),1             'next tile in explosion sequence
+          Inc UA(i)             'next tile in explosion sequence
           If UA(i)=253 Then xs=5*24:UT(i)=0 'done exploding
         EndIf
       Case 72 'magnet
@@ -881,7 +883,7 @@ Sub AI_units
           UT(i)=0 'free slot
         Else
           if dx=0 And dy=0 then 'pick up magnet
-            UT(i)=0:inc pl_ma,1:show_item
+            UT(i)=0:inc pl_ma:show_item
           else
             'check for robot contact with magnet
             j=has_unit(UX(i),UY(i))
@@ -909,13 +911,13 @@ Sub AI_units
         else
           em_on=0:UT(i)=0 'remove from list
         end if
-        inc UB(i),1
+        inc UB(i)
       Case 74 'canister blow or plasma blow
         if UA(i)=247 then 'only once...
           do_damage(UX(i),UY(i),UC(i),UD(i),UH(i)) 'do damage UH in radius < UC
           Play modsample s_dsbarexp,4
         end if
-        Inc UA(i),1  'next tile in explosion sequence
+        Inc UA(i)  'next tile in explosion sequence
         If UA(i)=253 Then UT(i)=0 'done exploding
     End Select
   Next
@@ -965,15 +967,18 @@ Sub AI_units
               UB(i)=1:play modsample s_door,4 'start animation
               UH(j)=0:UT(j)=0 'kill item immediately, and remove from play
               if j=0 then
-                writecomment("player terminated")
+                writecomment("Player terminated")
               else
-                writecomment("robot terminated")
+                writecomment("Robot terminated")
               end if
             end if
           end if
         else 'object in TC, crush it...
-          if UB(i)=0 then UB(i)=1:play modsample s_door,4 'start animation
-          writecomment("object crushed")
+          if UB(i)=0 then
+            UB(i)=1
+            play modsample s_door,4 'start animation
+            writecomment("Object crushed")
+          endif
         end if
         if UB(i)>0 then crush(i,UX(i),UY(i))
       case 19 'elevator
@@ -994,7 +999,7 @@ Sub AI_units
               open_elev(i,UX(i),UY(i))
               if UB(i)=2 then
                 for j=0 to 3:writecomment(" "):next
-                yp=yp+1:pl_md=p_w 'walk out
+                inc yp:pl_md=p_w 'walk out
               end if
             end if
           end if
@@ -1008,7 +1013,7 @@ Sub AI_units
           'move raft
           MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(&hCC) 'old becomes water
           if UA(i)=1 then 'move raft left
-            inc UX(i),1:if UX(i)=UC(i) then UA(i)=0:UD(i)=16 'wait at dock
+            inc UX(i):if UX(i)=UC(i) then UA(i)=0:UD(i)=16 'wait at dock
           else 'move right
             INC UX(i),-1:IF UX(i)=UB(i) then UA(i)=1:UD(i)=16
           end if
@@ -1107,7 +1112,7 @@ sub dazzle_bot(i)
   UD(i)=(UD(i)+1) And 3 'walking speed
   if UD(i)=0 then
     local r=int(rnd()*5),xy
-    inc UC(i),1 'time count 3,4...
+    inc UC(i) 'time count 3,4...
     if UC(i)<32 then '30=15 seconds, counter starts at 2
       'new random location bot
       select case r
@@ -1115,7 +1120,7 @@ sub dazzle_bot(i)
         case 1
           xy=UX(i)+1
           If (get_ta(xy,UY(i)) And b_wlk)>0 then
-            if Not(dy=0 And xy=xp) Then inc UX(i),1
+            if Not(dy=0 And xy=xp) Then inc UX(i)
           endif
         case 2
           xy=UX(i)-1
@@ -1125,7 +1130,7 @@ sub dazzle_bot(i)
         case 3
           xy=UY(i)+1
           If (get_ta(UX(i),xy) And b_wlk)>0 then
-            if Not(xy=yp And dx=0) Then inc UY(i),1
+            if Not(xy=yp And dx=0) Then inc UY(i)
           end if
         case 4
           xy=UY(i)-1
@@ -1322,7 +1327,7 @@ Function findslot()
     If UT(i)=0 Then
       Exit
     Else
-      Inc i,1
+      Inc i
     EndIf
   Loop Until i=32
   findslot=i
@@ -1339,7 +1344,7 @@ Function has_unit(x,y)
         If UY(i)=y Then has_unit=i
       end if
     end if
-    Inc i,1
+    Inc i
   Loop Until i=28
 End Function
   
@@ -1514,7 +1519,7 @@ End Sub
   'find the items in viewer area in the unit attributes
 Sub exec_viewer
   'do thingsEnd Function
-  Local i,j,a$="Nothing found"
+  Local i,j,a$="Nothing found",b
   For i=48 To 63 'hidden units
     If UT(i)>127 Then
       If UX(i)=xp+h1 Or UX(i)+UC(i)=xp+h1 Then
@@ -1537,9 +1542,10 @@ Sub exec_viewer
               pl_it=2:show_item
               a$="found "+Str$(UA(i))+" EMP's"
             Case 3'pistol
-              Inc pl_pa(1),UA(i)
+              b=choice(diff_level=0,2*UA(i),UA(i))
+              Inc pl_pa(1),b
               pl_wp=1:show_weapon
-              a$="found PISTOL with "+Str$(UA(i))+" bullets"
+              a$="found PISTOL with "+Str$(b)+" bullets"
             Case 4'plasma
               Inc pl_pa(2),UA(i)
               pl_wp=2:show_weapon
@@ -1659,7 +1665,7 @@ sub next_floor(h)
   local i
   for i=32 to 47 'range where elevators live
     if UT(i)=19 And UC(i)=pl_el+h then
-      xp=UX(i):yp=UY(i)-1:pl_el=pl_el+h 'go inside this elevator
+      xp=UX(i):yp=UY(i)-1:inc pl_el,h 'go inside this elevator
       UX(0)=xp:UY(0)=yp
       exit for 'found new floor
     endif
@@ -1680,11 +1686,11 @@ End Sub
 Sub statistics(b,h)
   Local ii,jj=0
   For ii=1 To 27   'check bots
-    If UT(ii)>0 Then Inc jj,1
+    If UT(ii)>0 Then Inc jj
   Next
   b=jj:jj=0
   For ii=48 To 63  'check secrets
-    If UT(ii)>127 Then Inc jj,1
+    If UT(ii)>127 Then Inc jj
   Next
   h=jj
 End Sub
@@ -1731,12 +1737,12 @@ End Sub
 sub select_music(a)
   Play stop
   select case a
-    case 0,1
+    case 0
+      Play modfile path$("music/get_psyched-sfx.mod")   'sfx combined with music
+    case 1
       Play modfile path$("music/sfcmetallicbop2.mod")   'sfx combined with music
     case 2
-      Play modfile path$("music/rushin_in-sfx-c.mod")   'sfx combined with music
-      '    case 0
-      '      Play modfile path$("music/get psyched.mod")       'sfx combined with music ?
+      Play modfile path$("music/rushin_in-sfx.mod")     'sfx combined with music
     case 3
       Play modfile path$("music/petsciisfx.mod")        'only sfx
   end select
@@ -2220,7 +2226,7 @@ Function ctrl_wii_classic$(init)
       End Select
     EndIf
     
-    ctrl_wiiclassic$ = s$
+    ctrl_wii_classic$ = s$
     Exit Function
   Else
     Device Wii Open
