@@ -190,6 +190,8 @@
             pl_bo=100:pl_em=100:pl_ma=100 'all items
             pl_mk=100                     'full medkit
           end if
+        Case "kill-all" 'F4 cheat key kills all bots
+          for i=1 to 27:UT(i)=0:next
         Case "map" 'TAB key show map + toggle player/robots
           Select Case map_mode
             Case 0
@@ -264,13 +266,13 @@
       
     EndIf 'pl_md<p_death
     
-    If k$ = "escape" Then
+    If k$ = "escape" And pl_md<p_death Then
       writecomment("PAUSE, press <ESC> to quit")
       kill_kb
       do
         pause 100:k$=read_input$()
       loop while k$=""
-      If k$ <> "escape" Then k$="" : writecomment("continue") 'any value that does not quit
+      If k$ <> "escape" Then k$="":writecomment("continue") 'any value that does not quit
     end if
     
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
@@ -278,9 +280,7 @@
   Loop Until k$ = "escape"   'quit when <esc> is pressed
   
   game_end
-  If LCD_DISPLAY Then FrameBuffer Copy f,n
-  
-  pause 5000:play stop:run
+  play stop:run
   
 End
   
@@ -316,13 +316,13 @@ Sub writesprites_l
           Case 1  'player
             If UH(i)>0 Then
               Sprite memory sprite_index(UA(i)),xs,ys,9
+              if UA(i)>&h4B then UA(i)=min(UA(i)+1,&h52)
             Else
-              If UA(i)>&h52 Then
+              If UA(i)=&h52 Then
                 game_over              'show end text
               Else
                 Sprite memory sprite_index(UA(i)),xs,ys,9
-                h_beat=min(h_beat+40,400):
-                Inc UA(i) 'slow down all, next sprite
+                h_beat=min(h_beat+40,400):Inc UA(i) 'slow down all, next sprite
               EndIf
             EndIf
           Case 2,3,4
@@ -349,6 +349,7 @@ Sub writesprites_l
       EndIf
     end if
   Next
+  
   For i=28 To 31
     dx=UX(i)-UX(0):dy=UY(i)-UY(0)
     If Abs(dx)<=xm then
@@ -395,6 +396,7 @@ Sub writesprites_l
       end if
     end if
   next
+  
   For i=32 To 47
     if UT(i)=19 then
       if UX(i)=UX(0) And UY(i)=UY(0)+1 then 'elevator
@@ -452,7 +454,10 @@ Sub game_over
   Box xs-32,ys,88,24,1,textc,bckgnd
   Text xs-24,ys+8,"GAME OVER",,,,textc,bckgnd
   pl_md=p_death
-  framebuffer write sc$:writecomment("press <ESC>"):framebuffer write l
+  framebuffer write sc$
+  writecomment(""):writecomment(""):writecomment("")
+  writecomment("Game over, press <ESC>")
+  framebuffer write l
 End Sub
   
   
@@ -468,8 +473,9 @@ End Sub
   
   'game end screen and statitics
 Sub game_end
-  FRAMEBUFFER write l:CLS
-  pause 100:FRAMEBUFFER write sc$:Load image path$("images/end.bmp")
+  FRAMEBUFFER write l:fade_out:FRAMEBUFFER write sc$
+  Load image path$("images/end.bmp")
+  FRAMEBUFFER write l:fade_in:FRAMEBUFFER write sc$
   statistics(left_bots,left_hidden)
   playtime=playtime\1000
   hh=playtime\(3600):hhh$=right$("0"+str$(hh),2)
@@ -482,6 +488,11 @@ Sub game_end
   Text 180,130,DIFF_LEVEL_WORD$(diff_level)
   Play stop
   Play modfile path$("music/" + Choice(left_bots, "lose.mod", "win.mod"))
+  pause 6000 'sufficient to have 1 win/loose sound
+  play stop:kill_kb
+  do
+  loop while read_input$()=""
+  FRAMEBUFFER write l:fade_out:FRAMEBUFFER write sc$
 End Sub
   
   
@@ -933,12 +944,16 @@ Sub AI_units
             UH(i)=&h1E+(UH(i)=&h1E) 'UH=tile toggle between &h1E and &h1F
             MID$(lv$(UY(i)),UX(i)+1,1)=Chr$(UH(i))  'active transporter
             if dx=0 And dy=0 then
-              if UC(i)=0 then
-                k$ = "escape" 'force game over by simulate pressing ESC
-              else
-                xp=UC(i):yp=UD(i) 'transport player
-              end if
-            end if
+              if UA(0)<48 then UA(0)=&h4C 'if active player -> first tile of animation
+              if UA(0)=&h52 then 'end of animation
+                if UC(i)=0 then
+                  UH(0)=0
+                  'k$ = "escape" 'force game over by simulate pressing ESC
+                else
+                  xp=UC(i):yp=UD(i):UA(0)=pl_sp   'transport player
+                endif
+              endif
+            endif
           else 'UA=1
             statistics(j,xy):if j=0 then UA(i)=0
           end if
