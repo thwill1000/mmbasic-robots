@@ -1896,140 +1896,134 @@ End Sub
   
   'startup Menu-------------------------------------@Martin
 Sub show_intro
-  'load screen
-  FRAMEBUFFER write l:CLS :FRAMEBUFFER write sc$
-  Load image path$("images/introscreen.bmp"),0,10
-  ' get space for the 4th Menu entry
-  Sprite 28,18,28,10,88,24:Box 32,21,80,34,,0,0
-  
-  FRAMEBUFFER write l: fade_in: :FRAMEBUFFER write sc$
-  Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
-  Local Message$(4) length 40
-  
-  'set Map to 0, Menu State to 1
-  Message$(1)="...use UP & DOWN, Space or 'Start'      "
-  Message$(2)="   ...use LEFT & RIGHT to select Map    "
-  Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
-  dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
-  Map_Nr=0:MS=1:Diff_level=1
-  
-  ' start playing the intro Music
-  Play Modfile path$("music/metal_heads-sfx.mod")
-  show_menu 1
-  
-  'Display Map Name
-  Text 9,70,UCase$(map_nam$(Map_Nr))
-  
-  '--- copyright notices etc
-  Text 0,224,Message$(1),,,,col(3)
-  Local msg$ = String$(36,32)
-  '  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
-  Cat msg$, "Original Game by David Murray - "
-  Cat msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
-  Cat msg$, "Community - Music by Noelle Aman, Graphic by "
-  Cat msg$, "Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
-  flip=0
-  MT=0
-  
-  'check player choice
-  kill_kb
-  Do
-    If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
-    tp$=Mid$(msg$,1+MT,41)
-    if t2=0 then 'once every 4 cycles
-      k$=read_input$()
-      If k$<>"" Then
-        play modsample s_beep-2,4
-        If k$="down" Then Inc MS,(MS<4)
-        If k$="up" Then Inc MS,-(MS>1)
-        If k$="use-item" Then
-          Select Case MS
-            Case 1
-              FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
-              Exit 'intro and go on with the Program
-            Case 2
-              'select map
-              kill_kb
-              Text 0,224,message$(2),,,,col(3)
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  play modsample s_beep-2,4
-                  If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
-                  If k$="right" Then Inc Map_Nr,(Map_Nr<13)
-                  If k$="use-item" Then
-                    Text 0,224,message$(1),,,,col(3): Exit
-                  EndIf
-                  Text 9,70,"                "
-                  Text 9,70,UCase$(map_nam$(Map_Nr))
-                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
-                EndIf
-                Pause 200
-              Loop
-              kill_kb
-            Case 3
-              'select DIFFICULTY
-              kill_kb
-              Text 0,224,message$(3),,,,col(3)
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  play modsample s_beep-2,4
-                  If k$="use-item" Then
-                    Text 0,224,message$(1),,,,col(3)
-                    Text 0,232,"      "
-                    Exit
-                  EndIf
-                  If k$="left" Then
-                    Inc Diff_Level,-(Diff_Level>0)
-                  EndIf
-                  If k$="right" Then
-                    Inc Diff_Level,(Diff_Level<2)
-                  EndIf
-                  Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
-                  Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
-                  If LCD_DISPLAY Then FrameBuffer Merge 9,b
-                EndIf
-                Pause 200
-              Loop
-              kill_kb
-            Case 4
-              'select CONTROLS
-          End Select
-        EndIf
-      endif
-    EndIf
-    
-    show_menu MS,col(puls(t))
-    
-    Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) And 3
-    Inc t: t=t Mod 12 'color change
-    inc t2: t2=t2 mod 3 'reponse time keys
-    If LCD_DISPLAY Then FrameBuffer Merge 9,b
-    Pause 50
-  Loop
-  Play stop
+ 'load screen
+ FRAMEBUFFER write l:CLS :FRAMEBUFFER write sc$
+ Load image path$("images/introscreen.bmp"),0,10
+ FRAMEBUFFER write l: fade_in: :FRAMEBUFFER write sc$
+ Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
+ Local Message$(4) length 40
+
+ 'set Map to 0, Menu State to 1
+ Message$(1)="...use UP & DOWN, Space or 'Start'      "
+ Message$(2)="   ...use LEFT & RIGHT to select Map    "
+ Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
+ Dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
+ Map_Nr=0:MS=1:Diff_level=1
+
+ ' start playing the intro Music
+ Play Modfile path$("music/metal_heads-sfx.mod")
+ show_menu 1
+
+ 'Display Map Name
+ Text 9,70,UCase$(map_nam$(Map_Nr))
+
+ '--- copyright notices etc
+ Text 0,224,Message$(1),,,,col(3)
+ Local msg$ = String$(36,32)
+ '  Cat msg$, sys.get_config$("device", "Generic " + Mm.Device$) + " - "
+ Inc msg$, "Original Game by David Murray - "
+ Inc msg$, "Port to Mite and MM-Basic by Volhout, Martin H and thebackshed-"
+ Inc msg$, "Community - Music by Noelle Aman, Graphic by "
+ Inc msg$, "Piotr Radecki - MMBasic by Geoff Graham and Peter Mather "
+ flip=0
+ MT=0
+
+ 'check player choice
+ kill_kb
+ Do
+   If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
+   tp$=Mid$(msg$,1+MT,41)
+   If t2=0 Then 'once every 4 cycles
+     k$=read_input$()
+     If k$<>"" Then
+       Play modsample s_beep-2,4
+       If k$="down" Then Inc MS,(MS<3)
+       If k$="up" Then Inc MS,-(MS>1)
+       If k$="use-item" Then
+         Select Case MS
+           Case 1
+             FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
+             Exit 'intro and go on with the Program
+           Case 2
+             'select map
+             kill_kb
+             Text 0,224,message$(2),,,,col(3)
+             Do
+               k$=read_input$()
+               If k$<>"" Then
+                 Play modsample s_beep-2,4
+                 If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
+                 If k$="right" Then Inc Map_Nr,(Map_Nr<13)
+                 If k$="use-item" Then
+                   Text 0,224,message$(1),,,,col(3): Exit
+                 EndIf
+                 Text 9,70,"                "
+                 Text 9,70,UCase$(map_nam$(Map_Nr))
+                 If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
+               EndIf
+               Pause 200
+             Loop
+             kill_kb
+           Case 3
+             'select DIFFICULTY
+             kill_kb
+             Text 0,224,message$(3),,,,col(3)
+             Do
+               k$=read_input$()
+               If k$<>"" Then
+                 Play modsample s_beep-2,4
+                 If k$="use-item" Then
+                   Text 0,224,message$(1),,,,col(3)
+                   Text 0,232,"      "
+                   Exit
+                 EndIf
+                 If k$="left" Then
+                   Inc Diff_Level,-(Diff_Level>0)
+                 EndIf
+                 If k$="right" Then
+                   Inc Diff_Level,(Diff_Level<2)
+                 EndIf
+                 Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
+                 Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
+                 If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
+               EndIf
+               Pause 200
+             Loop
+             kill_kb
+            End Select
+       EndIf
+     EndIf
+   EndIf
+
+   show_menu MS,col(puls(t))
+
+   Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) And 3
+   Inc t: t=t Mod 12 'color change
+   Inc t2: t2=t2 Mod 3 'reponse time keys
+   If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
+   Pause 50
+ Loop
+ Play stop
 End Sub
-  
-  
-  'remove duplicate keys and key repeat
+
+
+ 'remove duplicate keys and key repeat
 Sub kill_kb
-  Do While read_input$() <> "" : Loop
+ Do While read_input$() <> "" : Loop
 End Sub
-  
-  
-  'start menu selection list
+
+
+ 'start menu selection list
 Sub show_menu(n1,FC)
-  Local tc,BG=0,f2=col(10)
-  tc=f2 :If n1=1 Then tc=FC
-  Text 32,22,"START GAME",,,,tc
-  tc=f2 : :If n1=2 Then tc=FC
-  Text 32,30,"SELECT MAP",,,,tc
-  tc=f2 : :If n1=3 Then tc=FC
-  Text 32,38,"DIFFICULTY",,,,tc
-  tc=f2 : :If n1=4 Then tc=FC
-  Text 32,46,"CONTROLS  ",,,,tc
+ Local tc,BG=0,f2=col(10)
+ tc=f2 :If n1=1 Then tc=FC
+ Text 32,30,"START GAME",,,,tc
+ tc=f2 : :If n1=2 Then tc=FC
+ Text 32,38,"SELECT MAP",,,,tc
+ tc=f2 : :If n1=3 Then tc=FC
+ Text 32,46,"DIFFICULTY",,,,tc
 End Sub
+
   
   
 Sub fade_in
