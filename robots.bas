@@ -277,7 +277,7 @@
     EndIf 'pl_md<p_death
     
     If k$ = "quit" And pl_md<p_death Then
-      writecomment("PAUSE, press " + quit_key$() + " to quit")
+      writecomment("PAUSE, press " + quit_keys$() + " to quit")
       If LCD_DISPLAY Then FrameBuffer Merge 9,b
       flush_input
       do
@@ -467,7 +467,7 @@ Sub game_over
   pl_md=p_death
   framebuffer write sc$
   writecomment(""):writecomment(""):writecomment("")
-  writecomment("Game over, press " + quit_key$())
+  writecomment("Game over, press " + quit_keys$())
   framebuffer write l
 End Sub
   
