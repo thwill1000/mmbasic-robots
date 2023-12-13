@@ -1896,7 +1896,7 @@ Sub show_intro
   Message$(2)="   ...use LEFT & RIGHT to select Map    "
   Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
   dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
-  Map_Nr=0:MS=1:Difficulty=1
+  Map_Nr=0:MS=1:Diff_level=1
   
   ' start playing the intro Music
   Play Modfile path$("music/metal_heads-sfx.mod")
