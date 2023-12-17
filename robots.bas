@@ -1,4 +1,4 @@
-  'PETSCII ROBOTS for PicoMiteVGA needs MMBasic V50800b4 or later
+  'PETSCII ROBOTS for PicoMiteVGA needs MMBasic V5.08.00b4 or later
   
   Option default Integer
   
@@ -90,8 +90,8 @@
   ani_timer=1             'world animations
   writeworld_n(xm,ym)     'initialwold
   writecomment("Welcome to PETSCII Robots")
-  writecomment("Find and destroy "+str$(start_bots)+" robots")
-  framebuffer write L:fade_in:framebuffer write sc$
+  writecomment("Find and destory "+str$(start_bots)+" robots")
+  fade_in
   
   'game play variables
   spn=0                   'sprite number
@@ -484,9 +484,9 @@ End Sub
   
   'game end screen and statitics
 Sub game_end
-  FRAMEBUFFER write l:fade_out:FRAMEBUFFER write sc$
+  fade_out
   Load image path$("images/end.bmp")
-  FRAMEBUFFER write l:fade_in:FRAMEBUFFER write sc$
+  fade_in
   statistics(left_bots,left_hidden)
   playtime=playtime\1000
   hh=playtime\(3600):hhh$=right$("0"+str$(hh),2)
@@ -497,13 +497,11 @@ Sub game_end
   Text 180,98,Str$(left_bots)+" / "+Str$(start_bots)
   Text 180,114,Str$(left_hidden)+" / "+Str$(start_hidden)
   Text 180,130,DIFF_LEVEL_WORD$(diff_level)
-  Play stop
+  Play stop:If LCD_DISPLAY Then FrameBuffer Merge 9
   Play modfile path$("music/" + Choice(left_bots, "lose.mod", "win.mod"))
   pause 6000 'sufficient to have 1 win/loose sound
-  play stop:flush_input
-  do
-  loop while read_input$()=""
-  FRAMEBUFFER write l:fade_out:FRAMEBUFFER write sc$
+  play stop
+  fade_out
 End Sub
   
   
@@ -1915,7 +1913,7 @@ Sub show_intro
   'load screen
   FRAMEBUFFER write l:CLS :FRAMEBUFFER write sc$
   Load image path$("images/introscreen.bmp"),0,10
-  FRAMEBUFFER write l: fade_in: :FRAMEBUFFER write sc$
+  fade_in
   Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
   Local Message$(4) length 40
 
@@ -1959,7 +1957,7 @@ Sub show_intro
         If InStr("fire-a,use-item,move", k$) Then
           Select Case MS
             Case 1
-              FRAMEBUFFER write L:fade_out:FRAMEBUFFER write sc$
+              fade_out
               Exit 'intro and go on with the Program
             Case 2
               'select map
@@ -2050,6 +2048,7 @@ End Sub
   
   
 Sub fade_in
+  framebuffer write l
   Local n,x,y
   For n=0 To 7
     For x=n To 320 Step 8:Line x,0,x,240,,col(5):Next
@@ -2057,10 +2056,12 @@ Sub fade_in
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     Pause 50+130*LCD_DISPLAY
   Next
+  framebuffer write sc$
 End Sub
   
   
 Sub fade_out
+  framebuffer write l
   Local n,x,y
   For n=0 To 7
     For x=n To 320 Step 8:Line x,0,x,240,,0:Next
@@ -2068,6 +2069,7 @@ Sub fade_out
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
     Pause 50+130*LCD_DISPLAY
   Next
+  framebuffer write sc$
 End Sub
   
 Function read_input$()
@@ -2078,7 +2080,7 @@ Function read_input$()
   
   ' Suppress auto-repeat except for movement.
   If last$ = read_input$ Then
-    If Not InStr("up,down,left,right", last$) Then
+    If Not InStr("up,down,left,right,fire-up,fire-down,fire-left,fire-right", last$) Then
       read_input$ = ""
       Exit Function
     EndIf
