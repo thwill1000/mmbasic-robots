@@ -1,8 +1,30 @@
   'PETSCII ROBOTS for PicoMiteVGA needs MMBasic V5.08.00b4 or later
 
-  Option default Integer
+  Option Base 0
+  Option Explicit
+  Option Default Integer
 
-  Dim VERSION$ Length 8 = "RC6-sp"
+  Const VERSION = 100206 ' 1.0 RC 6
+
+  If Mm.Device$ = "MMB4L" Then
+    Option Simulate "PicoMiteVGA"
+    Option CodePage CMM2
+  EndIf
+
+  #Include "./splib/system.inc"
+  #Include "./splib/game.inc"
+
+  ' Prevent sptrans removing functions that are CALLed.
+  '!dynamic_call ctrl_atari_a$
+  '!dynamic_call ctrl_gamemite$
+  '!dynamic_call ctrl_nes_a$
+  '!dynamic_call ctrl_none$
+  '!dynamic_call ctrl_ps2$
+  '!dynamic_call ctrl_snes_a$
+  '!dynamic_call ctrl_wii_classic$
+
+  '!dynamic_call game.on_break
+  sys.override_break("game.on_break")
 
   ' system setup -----------------------------------------------------
 
@@ -13,17 +35,31 @@
 
   Const LCD_DISPLAY = Mm.Device$ = "PicoMite"
   Const SC$ = Choice(LCD_DISPLAY, "f", "n")
-  Const MOD_BUFF_128K = 1 ' Set true if using smaller/128K mod buffer.
+  Const MOD_BUFF_128K = 0 ' Set 1 if using smaller/128K mod buffer.
+  Const USE_PS2 = 1 ' Set 1 to read PS2 keyboard, or 0 to use INKEY$
 
-  Dim CTRL_DRIVER$ = Choice(LCD_DISPLAY, "ctrl_gamemite$", "ctrl_none$")
+  ' Determine controller driver and initialise.
+  Dim ctrl$ = Choice(LCD_DISPLAY, "ctrl_gamemite$", "ctrl_snes_a$")
   ' Uncomment one of these to override controller:
-  ' CTRL_DRIVER$ = "ctrl_atari_a$"      ' Atari Joystick on PicoGAME port A
-  ' CTRL_DRIVER$ = "ctrl_nes_a$"        ' NES gamepad on PicoGAME port A
-  ' CTRL_DRIVER$ = "ctrl_wii_classic$"  ' Wii Classic controller
-  If Call(CTRL_DRIVER$, 1) <> "" Then Error
+  ' ctrl$ = "ctrl_atari_a$"      ' Atari Joystick on PicoGAME port A
+  ' ctrl$ = "ctrl_nes_a$"        ' NES gamepad on PicoGAME port A
+  ' ctrl$ = "ctrl_wii_classic$"  ' Wii Classic controller
+  On Error Ignore ' Don't fail if controller is not connected.
+  If Call(ctrl$, 1) <> "" Then
+    On Error Abort
+    Error "Unexpected return from controller driver"
+  EndIf
+  If Mm.ErrNo Then ctrl$ = "ctrl_none$"
+  On Error Abort
+
+  Dim DIFF_LEVELS$(3) Length 10 =("EASY      ","NORMAL    ","HARD      ", "DIFFICULTY")
+
+  Dim keyboard = 1 ' 1 if the last user input was keyboard, 0 if it was controller.
+  Dim start_bots, start_hidden
 
   'screen setup
   If LCD_DISPLAY Then FRAMEBUFFER Create Else Mode 2
+  game.init_window("Attack of the PETSCII Robots for MMBasic", VERSION, " sp")
   FRAMEBUFFER layer 9 'color 9 is transparant
   Font 9
 
@@ -46,8 +82,10 @@
 
 
   'adapt hoverbots for difficulty level
+  Dim i
   if Diff_level=2 then
-      for i=1 to 27: if UT(i)=2 or UT(i)=3 then UT(i)=4
+    for i=1 to 27
+      if UT(i)=2 or UT(i)=3 then UT(i)=4
     next 'aggro all hoverbots
   end if
 
@@ -65,16 +103,18 @@
 
   'defines
   Const hsize=128,vsize=64  'world map 128x64
-  Const xm=5:ym=3           'view window on map # of tiles E-w and N-S
+  Const xm=5,ym=3           'view window on map # of tiles E-w and N-S
   Const ys=4*24             'vert window centre with 24*24 tile reference
   Dim xs=5*24               'hor window centre with 24*24 tile reference
 
+  Dim quit_counter          ' If QUIT is pressed whilst > 0 then quit current game.
+
   'start positions player in map in # tiles
-  xp=UX(0):yp=UY(0)         'xp and yp are used parallel to UX(0) and UY(0)
+  Dim xp=UX(0), yp=UY(0)     'xp and yp are used parallel to UX(0) and UY(0)
   UA(0)=0                   'UA=sprite number
 
   'default text settings
-  textc=RGB(green):bckgnd=0'black
+  Dim textc=RGB(green), bckgnd=0'black
 
   'write frame around playfield
   FRAMEBUFFER Write sc$
@@ -82,51 +122,59 @@
   If LCD_DISPLAY Then FrameBuffer Merge 9
 
   'start music/sfx modfile
-  music=1
+  Dim music=1
   select_music(map_nr mod 3)
 
   'write initial world
-  map_mode=0              'overview world map off
-  ani_timer=1             'world animations
+  Dim map_mode=0          'overview world map off
+  Dim ani_timer=1         'world animations
   writeworld_n(xm,ym)     'initialwold
   writecomment("Welcome to PETSCII Robots")
-  writecomment("Find and destory "+str$(start_bots)+" robots")
+  writecomment("Find and destroy "+str$(start_bots)+" robots")
   fade_in
 
   'game play variables
-  spn=0                   'sprite number
-  em_on=0                 '1=is emp active
-  mg_on=0                 '1=magent in use
-  timer=0:playtime=0      'time played in ms
+  Dim spn=0               'sprite number
+  Dim em_on=0             '1=is emp active
+  Dim mg_on=0             '1=magent in use
+  Dim playtime=0          'time played in ms
+  Timer = 0
 
   'initial player attributes
-  pl_sp=0        'default player is facing you
-  pl_mv=0        'walking move 0..4
-  pl_wp=0        'weapon holding (0=none, 1=pistol, 2=plasma
-  pl_md=0        'player mode (0=walk/fight, 1=search, 2,3=move)
-  pl_it=0        'player item
-  pl_el=0        'player elevator floor level
+  Dim pl_sp=0    'default player is facing you
+  Dim pl_mv=0    'walking move 0..4
+  Dim pl_wp=0    'weapon holding (0=none, 1=pistol, 2=plasma
+  Dim pl_md=0    'player mode (0=walk/fight, 1=search, 2,3=move)
+  Dim pl_it=0    'player item
+  Dim pl_el=0    'player elevator floor level
   writeplayer(0,0,pl_wp)
 
   'init inventory
-  pl_ky=0         'player found 0 keys
+  Dim pl_ky=0     'player found 0 keys
   Dim pl_pa(2)=(0,0,0)  'none,pistol ammo(1),plasma ammo(2)
-  pl_bo=0         '#bombs
-  pl_em=0         '#EMP
-  pl_mk=0         'medkit
-  pl_ma=0         '#magnets
+  Dim pl_bo=0     '#bombs
+  Dim pl_em=0     '#EMP
+  Dim pl_mk=0     'medkit
+  Dim pl_ma=0     '#magnets
 
-
+  Dim h, hp, k$, shot, unit, tmp$, v, vp, x, y
+  Dim h1, h2, v1, v2
+  Dim ox, oy, tx, ty  ' Coordinates when moving object
 
 
 
   'main player input loop -----------------------------------------
   Do
-    'player input through keyboard, clearing buffer, check loop time
-    k$="":Text 290,0,Right$("00"+Str$(timer,3,0),3)
+    If quit_counter Then Inc quit_counter, -1
+
+    Text 290,0,Right$("00"+Str$(timer,3,0),3) ' Show Last frame duration.
+    Do While h_beat - Timer > 10 : Pause 1 : Loop ' Slow down reading input on very fast systems.
+
+    ' Read input from keyboard + controller.
+    k$ = ""
     Do
       tmp$=read_input$()
-      If tmp$<>"" Then k$=tmp$  'keep last valid key
+      If tmp$<>"" Then k$=tmp$ ' Keep last valid input.
     Loop Until Timer>h_beat
     Inc playtime, Timer : Timer=0
 
@@ -198,25 +246,33 @@
         Case "map" 'TAB key show map + toggle player/robots
           Play ModSample s_beep, 4
           Select Case map_mode
-            Case 0
-              map_mode=1      'stop showing normal mode
-              FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
-              renderLiveMap   'show map mode
-            Case 1
-              map_mode=Choice(diff_level<2,2,0)
-            Case 2
-              map_mode=Choice(diff_level<1,3,0)
-            Case 3
-              map_mode=0
-              FRAMEBUFFER write l:CLS  col(5):FRAMEBUFFER write sc$ 'clear layer
-              writeplayer(hp,vp,pl_wp)
+            Case 0 : map_mode = 1
+            Case 1 : map_mode = Choice(diff_level < 2, 2, 0)
+            Case 2 : map_mode = Choice(diff_level < 1, 3, 0)
+            Case 3 : map_mode = 0
           End Select
           Select Case map_mode
-            Case 0: writecomment("Map deactivated")
-            Case 1: writecomment("Map activated")
-            Case 2: writecomment("Map displaying robots")
-            Case 3: writecomment("Map displaying objects")
+            Case 0
+              WriteComment("Map deactivated")
+              FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
+              writeplayer(hp,vp,pl_wp)
+            Case 1
+              WriteComment("Map activated")
+              FRAMEBUFFER write l:CLS col(5):FRAMEBUFFER write sc$ 'clear layer
+              RenderLiveMap()
+            Case 2
+              WriteComment("Map displaying robots")
+            Case 3
+              WriteComment("Map displaying objects")
           End Select
+        Case "quit"
+          If Not quit_counter Then
+            Play ModSample s_beep, 4
+
+            WriteComment("Press " + quit_keys$() + " to QUIT")
+            quit_counter% = 20
+            k$ = "" ' Do not quit at end of loop.
+          EndIf
       End Select
 
       'fire weapon
@@ -248,7 +304,7 @@
       'update the world in the viewing window
       If map_mode=0 Then
 
-        'the viewe modes animated in the main loop
+        'the viewer modes animated in the main loop
         Select Case pl_md
           Case p_s1
             show_mode(&h53)  'show viewer
@@ -276,22 +332,13 @@
 
     EndIf 'pl_md<p_death
 
-    If k$ = "quit" And pl_md<p_death Then
-      writecomment("PAUSE, press " + quit_keys$() + " to quit")
-      If LCD_DISPLAY Then FrameBuffer Merge 9,b
-      flush_input
-      do
-        pause 100:k$=read_input$()
-      loop while k$=""
-      If k$ <> "quit" Then k$="":writecomment("continue") 'any value that does not quit
-    end if
-
     If LCD_DISPLAY Then FrameBuffer Merge 9,b
 
   Loop Until k$ = "quit"
 
   game_end
-  play stop:run
+  play stop
+  run , Mm.CmdLine$
 
 End
 
@@ -301,7 +348,7 @@ End
 
   'uses tiles stored in library to build up playfield in layer N
 Sub writeworld_n(xm,ym)
-  local xsn,xpn,spn
+  Local spn, xn, xsn, xpn, yn
   For xn=-xm To xm
     xsn=xs+xn*24:xpn=xp+xn+1+lva
     For yn=-ym To ym
@@ -466,8 +513,7 @@ Sub game_over
   Text xs-24,ys+8,"GAME OVER",,,,textc,bckgnd
   pl_md=p_death
   framebuffer write sc$
-  writecomment(""):writecomment(""):writecomment("")
-  writecomment("Game over, press " + quit_keys$())
+  writecomment("Press " + quit_keys$())
   framebuffer write l
 End Sub
 
@@ -482,24 +528,26 @@ Sub loading
 End Sub
 
 
-  'game end screen and statitics
+  'game end screen and statistics
 Sub game_end
+  Local left_bots, left_hidden
   fade_out
   Load image path$("images/end.bmp")
-  fade_in
   statistics(left_bots,left_hidden)
+  Text 160,42,Choice(left_bots, "You Lose!", "You Win!"),CT
   playtime=playtime\1000
-  hh=playtime\(3600):hhh$=right$("0"+str$(hh),2)
-  mm=(playtime-hh*3600)\60:mmm$=right$("0"+str$(mm),2)
-  ss=playtime-hh*3600-mm*60:sss$=right$("0"+str$(ss),2)
-  Text 180,66,map_nam$(map_nr)
+  Const hh=playtime\(3600), hhh$=right$("0"+Str$(hh),2)
+  Const mm=(playtime-hh*3600)\60, mmm$=right$("0"+Str$(mm),2)
+  Const ss=playtime-hh*3600-mm*60, sss$=right$("0"+Str$(ss),2)
+  Text 180,66,UCase$(map_nam$(map_nr))
   Text 180,82,hhh$+":"+mmm$+":"+sss$
   Text 180,98,Str$(left_bots)+" / "+Str$(start_bots)
   Text 180,114,Str$(left_hidden)+" / "+Str$(start_hidden)
-  Text 180,130,DIFF_LEVEL_WORD$(diff_level)
-  Play stop:If LCD_DISPLAY Then FrameBuffer Merge 9
+  Text 180,130,DIFF_LEVELS$(diff_level)
+  Play stop
+  fade_in
   Play modfile path$("music/" + Choice(left_bots, "lose.mod", "win.mod"))
-  pause 6000 'sufficient to have 1 win/loose sound
+  pause 6000 'sufficient to have 1 win/lose sound
   play stop
   fade_out
 End Sub
@@ -611,8 +659,7 @@ End Sub
 
   'show hand over the tile that is to be moved
 Sub target_move
-  ox=xp+h:oy=yp+v             'map coordinates of object to be moved
-  hm=h:vm=v                   'global for use later
+  ox=xp+h : oy=yp+v      'map coordinates of object to be moved
   If (get_ta(ox,oy) And b_mov) Then     'can object be moved?
     sprite_item(&h55,24*h+xs,24*v+ys)
     flush_input
@@ -630,7 +677,7 @@ Sub place_bomb
   If i<32 Then
     UT(i)=71:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h57:UB(i)=30:UC(i)=3:UH(i)=11
     Inc pl_bo,-1:show_item
-    writecomment("you placed a bomb")
+    writecomment("You placed a bomb")
   EndIf
 End Sub
 
@@ -650,7 +697,7 @@ Sub place_magnet
   If i<32 Then
     UT(i)=72:UX(i)=xp+h:UY(i)=yp+v:UA(i)=&h58:UB(i)=150
     Inc pl_ma,-1:show_item
-    writecomment("you placed a magnet")
+    writecomment("You placed a magnet")
   EndIf
 End Sub
 
@@ -775,6 +822,7 @@ End Sub
   'routine runs in layer L, only some UNITS revert to n
 
 Sub AI_units
+  Static once
   Local i,dx,dy,nearx,neary,xy,j
 
   if em_on=0 then
@@ -786,7 +834,7 @@ Sub AI_units
         Case 2 'hoverbot_h
           If UH(i)>0 Then
             if UC(i)>1 then
-              dazzle_bot(i)
+              dazzle_bot(i,dx,dy)
             else
               walk_bot_h(i,dx,dy,b_hov)
             end if
@@ -796,7 +844,7 @@ Sub AI_units
         Case 3 'hoverbot_v
           If UH(i)>0 Then
             if UC(i)>1 then
-              dazzle_bot(i)
+              dazzle_bot(i,dx,dy)
             else
               walk_bot_v(i,dx,dy,b_hov)
             end if
@@ -812,7 +860,7 @@ Sub AI_units
                 UH(0)=max(UH(0)-1,0)  'damage player
               else
                 if UC(i)>1 then
-                  dazzle_bot(i)
+                  dazzle_bot(i,dx,dy)
                 else
                   agro_bot(i,dx,dy,b_hov) 'bot move closer
                 end if
@@ -836,7 +884,7 @@ Sub AI_units
                 UH(0)=max(UH(0)-6,0)  'damage player
               else
                 if UC(i)>1 then
-                  dazzle_bot(i)
+                  dazzle_bot(i,dx,dy)
                 else
                   agro_bot(i,dx,dy,0) 'bot move closer
                 end if
@@ -848,7 +896,7 @@ Sub AI_units
         Case 17 'rollerbot_v
           If UH(i)>0 Then
             if UC(i)>1 then
-              dazzle_bot(i)
+              dazzle_bot(i,dx,dy)
             else
               walk_bot_v(i,dx,dy,0)
             end if
@@ -863,7 +911,7 @@ Sub AI_units
         Case 18 'rollerbot_h
           If UH(i)>0 Then
             if UC(i)>1 then
-              dazzle_bot(i)
+              dazzle_bot(i,dx,dy)
             else
               walk_bot_h(i,dx,dy,0)
             end if
@@ -894,7 +942,7 @@ Sub AI_units
         EndIf
         If UB(i)<0 Then
           xof=4-xof:xs=5*24 - xof 'shake screen
-          Inc UA(i)             'next tile in explosion sequence
+          Inc UA(i)               'next tile in explosion sequence
           If UA(i)=253 Then xs=5*24:UT(i)=0 'done exploding
         EndIf
       Case 72 'magnet
@@ -990,11 +1038,7 @@ Sub AI_units
             if UH(j)>0 then
               UB(i)=1:play modsample s_door,4 'start animation
               UH(j)=0:UT(j)=0 'kill item immediately, and remove from play
-              if j=0 then
-                writecomment("Player terminated")
-              else
-                writecomment("Robot terminated")
-              end if
+              writecomment(Choice(j, "Robot", "Player") + " terminated")
             end if
           end if
         else 'object in TC, crush it...
@@ -1132,7 +1176,7 @@ Sub walk_bot_v(i,dx,dy,hov)
 End Sub
 
 
-sub dazzle_bot(i)
+sub dazzle_bot(i,dx,dy)
   UD(i)=(UD(i)+1) And 3 'walking speed
   if UD(i)=0 then
     local r=int(rnd()*5),xy
@@ -1556,32 +1600,32 @@ Sub exec_viewer
             Case 0'key
               pl_ky=pl_ky Or 2^UA(i)
               show_keys
-              a$="found "+keyz$(UA(i)+1)+" KEY"
+              a$="Found "+keyz$(UA(i)+1)+" KEY"
             Case 1'bomb
               Inc pl_bo,UA(i)
               pl_it=4:show_item
-              a$="found "+Str$(UA(i))+" TIME BOMBS"
+              a$="Found "+Str$(UA(i))+" TIME BOMBS"
             Case 2'emp
               Inc pl_em,UA(i)
               pl_it=2:show_item
-              a$="found "+Str$(UA(i))+" EMP's"
+              a$="Found "+Str$(UA(i))+" EMP's"
             Case 3'pistol
               b=choice(diff_level=0,2*UA(i),UA(i))
               Inc pl_pa(1),b
               pl_wp=1:show_weapon
-              a$="found PISTOL with "+Str$(b)+" bullets"
+              a$="Found PISTOL with "+Str$(b)+" bullets"
             Case 4'plasma
               Inc pl_pa(2),UA(i)
               pl_wp=2:show_weapon
-              a$="found PLASMA gun with "+Str$(UA(i))+" shots"
+              a$="Found PLASMA gun with "+Str$(UA(i))+" shots"
             Case 5'medkit
               Inc pl_mk,UA(i)
               pl_it=1:show_item
-              a$="found MEDKIT healing "+Str$(UA(i))
-            Case 3'magnet
+              a$="Found MEDKIT healing "+Str$(UA(i))
+            Case 6'magnet
               Inc pl_ma,UA(i)
               pl_it=3:show_item
-              a$="found "+Str$(UA(i))+" MAGNETS"
+              a$="Found "+Str$(UA(i))+" MAGNETS"
           End Select
           writecomment(a$)
         EndIf
@@ -1616,6 +1660,7 @@ Sub exec_move
       MID$(lv$(oy),ox+1,1)=tl$
       move_hidden
       Play modsample s_move,4
+      flush_input()
     end if
   Else
     writecomment("Object cannot move here")
@@ -1647,14 +1692,14 @@ Sub use_item
       a=Min(a,pl_mk)
       Inc pl_mk,-a:Inc UH(0),a
       Play modsample s_medkit,4
-      writecomment("you gained "+Str$(a)+" life")
+      writecomment("You gained "+Str$(a)+" health")
     Case 2 'emp
       if pl_em>0 then
         a=findslot()
         if a<32 then
           UT(a)=73:UX(a)=xp:UY(a)=yp:UB(a)=0  'start emp
           pl_em=max(pl_em-1,0)                'lower inventory
-          writecomment("you placed an EMP")
+          writecomment("You placed an EMP")
           writecomment("ROBOTS near you will reboot")
           play modsample s_emp,4  'emp sound
         end if
@@ -1797,13 +1842,14 @@ Sub loadworld
   Dim LV$(63) Length 128  'the map 128h x 64v with tile numbers
   Dim DP$                 '255(+1) destruct paths
   Dim TA$                 '255(+1) tile attributes
-  lva=Peek(varaddr LV$())
-  taa=Peek(varaddr TA$)
+  Dim lva=Peek(varaddr LV$())
+  Dim taa=Peek(varaddr TA$)
 
   'load world map and attributes
   pause 100: Open path$("data/level-"+Chr$(97+Map_Nr)) For input As #1
 
   'load unit attributes in arrays
+  Local i
   For i=0 To 63: UT(i)=Asc(Input$(1,#1)):Next
   For i=0 To 63: UX(i)=Asc(Input$(1,#1)):Next
   For i=0 To 63: UY(i)=Asc(Input$(1,#1)):Next
@@ -1815,7 +1861,7 @@ Sub loadworld
 
 
   'load world map
-  dummy$=Input$(128,#1)  '256 empty bytes
+  Local dummy$=Input$(128,#1)  '256 empty bytes
   dummy$=Input$(128,#1)
   For i=0 To 63:LV$(i)=Input$(128,#1):Next
   Close #1
@@ -1847,17 +1893,18 @@ End Sub
   'assign sound effects names
 Sub preload_sfx
   'for all combined MOD files by Martin.H
-  s_dsbarexp=16:s_dspistol=17:s_beep=18:s_beep2=19:s_cycle_item=20:s_cycle_weapon=21
-  s_door=22:s_emp=23:S_error=24:s_found_item=25:s_magnet2=26:s_medkit=27:s_move=28
-  s_plasma=29:s_shock=30
+  Dim s_dsbarexp=16, s_dspistol=17, s_beep=18, s_beep2=19, s_cycle_item=20, s_cycle_weapon=21
+  Dim s_door=22, s_emp=23, s_error=24, s_found_item=25, s_magnet2=26, s_medkit=27, s_move=28
+  Dim s_plasma=29, s_shock=30
 End Sub
 
 
   'read color values and MAP_NAME$
 Sub init_map_support
   'read color values and MAP_NAME$
-  Dim col(15):Restore colors:For f=1 To 15:Read col(f):Next
-  Dim map_nam$(13) length 16 :Restore map_names:For f=0 To 13:Read map_nam$(f):Next
+  Local i
+  Dim col(15):Restore colors:For i=1 To 15:Read col(i):Next
+  Dim map_nam$(13) length 16 :Restore map_names:For i=0 To 13:Read map_nam$(i):Next
 End Sub
 
 
@@ -1880,6 +1927,7 @@ Sub loadgraphics
   'read index file. the order must not be changed
   Open path$("lib/flash_index.txt") For input As #1
 
+  Local a$, i
   For i=0 To &hFF
     Input #1,a$:tile_index(i)=Val(a$)+fl_adr
   Next
@@ -1913,109 +1961,73 @@ Sub show_intro
   'load screen
   FRAMEBUFFER write l:CLS :FRAMEBUFFER write sc$
   Load image path$("images/introscreen.bmp"),0,10
+  ' get space for the 4th Menu entry
+  Blit 28,18,28,10,88,24:Box 32,21,80,34,,0,0
   fade_in
-  Local integer puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
-  Local Message$(4) length 40
+  Local puls(11)=(0,1,9,11,3,6,7,6,5,11,9,1),t,t2
 
-  'set Map to 0, Menu State to 1
-  Message$(1)="...use UP & DOWN, Space or 'Start'      "
-  Message$(2)="   ...use LEFT & RIGHT to select Map    "
-  Message$(3)="  ...use LEFT & RIGHT cange Difficulty  "
-  Dim DIFF_LEVEL_WORD$(2) length 6 =("EASY  ","NORMAL","HARD  ")
-  Map_Nr=0:MS=1:Diff_level=1
+  Dim Map_Nr = 0
+  Dim Diff_level = 3 ' Dummy difficulty level which will be converted to 1.
 
   ' start playing the intro Music
   Play Modfile path$("music/metal_heads-sfx.mod")
-  show_menu 1
 
   'Display Map Name
   Text 9,70,UCase$(map_nam$(Map_Nr))
 
   '--- copyright notices etc
-  Text 0,224,Message$(1),,,,col(3)
+  Text 0,224,"      Use UP, DOWN & Space or START       ",,,,col(3)
   Local msg$ = String$(36,32)
-  Cat msg$, "Version " + VERSION$ + " - "
+  Cat msg$, "Version " + sys.format_version$(VERSION) + " sp - "
   Cat msg$, "Original game by David Murray - "
   Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
   Cat msg$, "Graphics by Piotr Radecki - "
   Cat msg$, "Music by Noelle Aman - "
   Cat msg$, "MMBasic by Geoff Graham & Peter Mather "
-  flip=0
-  MT=0
+
+  Local flip=0, k$, selection=1, mt=0
 
   'check player choice
-  flush_input
+  flush_input()
   Do
-    If flip=0 Then Inc MT:If mt>Len(msg$) Then MT=0
-    tp$=Mid$(msg$,1+MT,41)
-    If t2=0 Then 'once every 4 cycles
-      k$=read_input$()
-      If k$<>"" Then
-        Play modsample s_beep-2,4
-        If k$="down" Then Inc MS,(MS<3)
-        If k$="up" Then Inc MS,-(MS>1)
-        If InStr("fire-a,use-item,move", k$) Then
-          Select Case MS
-            Case 1
-              fade_out
-              Exit 'intro and go on with the Program
-            Case 2
-              'select map
-              flush_input
-              Text 0,224,message$(2),,,,col(3)
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  Play modsample s_beep-2,4
-                  If k$="left" Then Inc Map_Nr,-(Map_Nr>0)
-                  If k$="right" Then Inc Map_Nr,(Map_Nr<13)
-                  If InStr("fire-a,use-item,move", k$) Then
-                    Text 0,224,message$(1),,,,col(3): Exit
-                  EndIf
-                  Text 9,70,"                "
-                  Text 9,70,UCase$(map_nam$(Map_Nr))
-                  If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
-                EndIf
-                Pause 200
-              Loop
-              flush_input
-            Case 3
-              'select DIFFICULTY
-              flush_input
-              Text 0,224,message$(3),,,,col(3)
-              Do
-                k$=read_input$()
-                If k$<>"" Then
-                  Play modsample s_beep-2,4
-                  If InStr("fire-a,use-item,move", k$) Then
-                    Text 0,224,message$(1),,,,col(3)
-                    Text 0,232,"      "
-                    Exit
-                  EndIf
-                  If k$="left" Then
-                    Inc Diff_Level,-(Diff_Level>0)
-                  EndIf
-                  If k$="right" Then
-                    Inc Diff_Level,(Diff_Level<2)
-                  EndIf
-                  Text 0,232,DIFF_LEVEL_WORD$(Diff_Level)
-                  Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
-                  If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
-                EndIf
-                Pause 200
-              Loop
-              flush_input
-          End Select
-        EndIf
-      EndIf
-    EndIf
+    show_menu selection,col(puls(t))
+    Text 8-(2*flip),0,Mid$(msg$,1+mt,41),,,,col(2)
+    flip=(flip+1) Mod 4
+    If flip=0 Then Inc mt
+    If mt>Len(msg$) Then mt=0
+    t=(t + 1) Mod Bound(puls(), 1) 'color change
 
-    show_menu MS,col(puls(t))
+    k$=read_input$(1)
+    If k$<>"" Then play modsample s_beep-2,4
+    If InStr(k$, "fire") Then k$ = "use-item"
+    Select Case k$
+      Case "down"
+        Inc selection,(selection<4)
+      Case "up"
+        Inc selection,-(selection>1)
+      Case "use-item"
+        Select Case selection
+          Case 1
+            If Diff_Level = 3 Then Diff_Level = 1
+            Exit Do
+          Case 2
+            Inc Map_Nr
+            If Map_Nr > 13 Then Map_Nr = 0
+            Text 9,70,UCase$(map_nam$(Map_Nr))
+          Case 3
+            If Diff_Level = 3 Then
+              Diff_Level = 1
+            Else
+              Inc Diff_Level
+              If Diff_Level > 2 Then Diff_Level = 0
+            EndIf
+            Load image path$("images/face_"+Str$(Diff_Level)+".bmp"),234,85
+          Case 4
+            game.end()
+        End Select
+    End Select
 
-    Text 8-(2*flip),0,tp$,,,,col(2):flip=(flip+1) And 3
-    Inc t: t=t Mod 12 'color change
-    Inc t2: t2=t2 Mod 3 'reponse time keys
-    If LCD_DISPLAY Then FRAMEBUFFER Merge 9,b
+    If LCD_DISPLAY Then FrameBuffer Merge 9,b
     Pause 50
   Loop
   Play stop
@@ -2028,21 +2040,23 @@ End Sub
 Sub flush_input()
   Local k$
   Do
-    k$ = read_inkey$()
-    If k$ = "" Then k$ = Call(CTRL_DRIVER$)
+    k$ = Choice(USE_PS2, ctrl_ps2$(), ctrl_inkey$())
+    If k$ = "" Then k$ = Call(ctrl$)
   Loop Until k$ = ""
 End Sub
 
 
- 'start menu selection list
+  'start menu selection list
 Sub show_menu(n1,FC)
- Local tc,BG=0,f2=col(10)
- tc=f2 :If n1=1 Then tc=FC
- Text 32,30,"START GAME",,,,tc
- tc=f2 : :If n1=2 Then tc=FC
- Text 32,38,"SELECT MAP",,,,tc
- tc=f2 : :If n1=3 Then tc=FC
- Text 32,46,"DIFFICULTY",,,,tc
+  Local tc,BG=0,f2=col(10)
+  tc=f2 :If n1=1 Then tc=FC
+  Text 32,22,"START GAME",,,,tc
+  tc=f2 : :If n1=2 Then tc=FC
+  Text 32,30,"SELECT MAP",,,,tc
+  tc=f2 : :If n1=3 Then tc=FC
+  Text 32,38,DIFF_LEVELS$(Diff_Level),,,,tc
+  tc=f2 : :If n1=4 Then tc=FC
+  Text 32,46,"QUIT      ",,,,tc
 End Sub
 
 
@@ -2072,13 +2086,20 @@ Sub fade_out
   framebuffer write sc$
 End Sub
 
-Function read_input$()
+' @param  z%  If <> 0 then return "" if previous call did not return empty string.
+Function read_input$(z%)
   Static last$
-  read_input$ = read_inkey$()
-  If Len(read_input$) Then Exit Function
-  read_input$ = Call(CTRL_DRIVER$)
+  read_input$ = Choice(USE_PS2, ctrl_ps2$(), ctrl_inkey$())
+  If read_input$ = "" Then
+    read_input$ = Call(ctrl$)
+    If read_input$ <> "" Then keyboard = 0
+  Else
+    keyboard = 1
+  EndIf
+  If read_input$ = "" Then last$ = "" : Exit Function
+  If z% And last$ <> "" Then read_input$ = "" : Exit Function
 
-  ' Suppress auto-repeat except for movement.
+  ' Suppress auto-repeat except for movement and shooting.
   If last$ = read_input$ Then
     If Not InStr("up,down,left,right,fire-up,fire-down,fire-left,fire-right", last$) Then
       read_input$ = ""
@@ -2089,41 +2110,86 @@ Function read_input$()
   EndIf
 End Function
 
-Function read_inkey$()
-  Select Case Asc(Inkey$)
-      Case 0   : Exit Function
-      Case 9   : read_inkey$ = "map"          ' Tab
-      Case 27  : read_inkey$ = "quit"
-      Case 32  : read_inkey$ = "use-item"     ' Space
-      Case 77  : read_inkey$ = "toggle-music" ' M
-      Case 97  : read_inkey$ = "fire-left"    ' a
-      Case 100 : read_inkey$ = "fire-right"   ' d
-      Case 109 : read_inkey$ = "move"         ' m
-      Case 115 : read_inkey$ = "fire-down"    ' s
-      Case 119 : read_inkey$ = "fire-up"      ' w
-      Case 121, 122 : read_inkey$ = "search"  ' y, z
-      Case 128 : read_inkey$ = "up"
-      Case 129 : read_inkey$ = "down"
-      Case 130 : read_inkey$ = "left"
-      Case 131 : read_inkey$ = "right"
-      Case 145 : read_inkey$ = "toggle-weapon" ' F1
-      Case 146 : read_inkey$ = "toggle-item"   ' F2
-      Case 147 : read_inkey$ = "cheat"         ' F3
-      Case 148 : read_inkey$ = "kill-all"      ' F4
-  End Select
-End Function
 
-  '---joystick/Gamepad specific settings
+' Controller drivers -----------------------------------------------------------
+'
+' These all take a 'mode' parameter:
+'   0 - read controller
+'   1 - initialise controller
+'   2 - get QUIT combination for controller.
 
 
-  ' Dummy controller driver.
-Function ctrl_none$(init)
+' Dummy controller driver.
+Function ctrl_none$(mode)
 End Function
 
 
-  ' Controller driver for Game*Mite.
-Function ctrl_gamemite$(init)
-  If Not init Then
+' Keyboard driver using INKEY$.
+Function ctrl_inkey$(mode)
+  If Not mode Then
+    Local s$
+    Select Case Asc(Inkey$)
+        Case 0   : Exit Function
+        Case 9   : s$ = "map"          ' Tab
+        Case 27  : s$ = "quit"         ' Escape
+        Case 32  : s$ = "use-item"     ' Space
+        Case 77  : s$ = "toggle-music" ' M
+        Case 97  : s$ = "fire-left"    ' a
+        Case 100 : s$ = "fire-right"   ' d
+        Case 109 : s$ = "move"         ' m
+        Case 115 : s$ = "fire-down"    ' s
+        Case 119 : s$ = "fire-up"      ' w
+        Case 121, 122 : s$ = "search"  ' y, z
+        Case 128 : s$ = "up"
+        Case 129 : s$ = "down"
+        Case 130 : s$ = "left"
+        Case 131 : s$ = "right"
+        Case 145 : s$ = "toggle-weapon" ' F1
+        Case 146 : s$ = "toggle-item"   ' F2
+        Case 147 : s$ = "cheat"         ' F3
+        Case 148 : s$ = "kill-all"      ' F4
+    End Select
+    ctrl_inkey$ = s$
+    Exit Function
+  ElseIf mode = 2 Then
+    ctrl_inkey$= "ESCAPE"
+  EndIf
+End Function
+
+
+' Keyboard driver using PS2.
+Function ctrl_ps2$(mode)
+  If Not mode then
+    Local s$
+    Select Case Mm.Info(PS2)
+        Case &h05 : s$ = "toggle-weapon" ' F1
+        Case &h06 : s$ = "toggle-item"   ' F2
+        Case &h04 : s$ = "cheat"         ' F3 cheat code
+        Case &h0C : s$ = "kill-all"      ' F4 cheat code
+        Case &h29 : s$ = "use-item"      ' Space
+        Case &h0D : s$ = "map"           ' Tab
+        Case &h76 : s$ = "quit"          ' Escape
+        Case &h1B : s$ = "fire-down"     ' s
+        Case &h23 : s$ = "fire-right"    ' d
+        Case &h1D : s$ = "fire-up"       ' w
+        Case &h1C : s$ = "fire-left"     ' a
+        Case &h3A : s$ = "move"          ' m
+        Case &h1A : s$ = "search"        ' z
+        Case &hE072 : s$ = "down"
+        Case &hE075 : s$ = "up"
+        Case &hE06B : s$ = "left"
+        Case &hE074 : s$ = "right"
+    End Select
+    ctrl_ps2$=s$
+    Exit Function
+  ElseIf mode = 2 Then
+    ctrl_ps2$ = "ESCAPE"
+  EndIf
+End Function
+
+' Controller driver for Game*Mite.
+Function ctrl_gamemite$(mode)
+  If Not mode Then
     Local bits = Inv Port(GP8, 8) And &hFF, s$
 
     Select Case bits
@@ -2148,19 +2214,21 @@ Function ctrl_gamemite$(init)
 
     ctrl_gamemite$ = s$
     Exit Function
-  Else
+  ElseIf mode = 1 Then
     ' Initialise GP8-GP15 as digital inputs with PullUp resistors
     Local i
     For i = 8 To 15
       SetPin MM.Info(PinNo "GP" + Str$(i)), Din, PullUp
     Next
+  ElseIf mode = 2 Then
+    ctrl_gamemite$ = "A+B"
   EndIf
 End Function
 
 
-  ' Controller driver for NES gamepad connected to PicoGAME VGA port A.
-Function ctrl_nes_a$(init)
-  If Not init Then
+' Controller driver for NES gamepad connected to PicoGAME VGA port A.
+Function ctrl_nes_a$(mode)
+  If Not mode Then
     Local bits, i, s$
 
     Pulse NES_A_LATCH, NES_PULSE!
@@ -2190,19 +2258,65 @@ Function ctrl_nes_a$(init)
 
     ctrl_nes_a$ = s$
     Exit Function
-  Else
+  ElseIf mode = 1 Then
     SetPin NES_A_DATA, DIn
     SetPin NES_A_LATCH, DOut
     SetPin NES_A_CLOCK, DOut
     SetPin GP14, DOut
     Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
+  ElseIf mode = 2 Then
+    ctrl_nes_a$ = "SELECT"
   EndIf
 End Function
 
 
-  ' Controller driver for Atari joystick connected to PicoGAME VGA port A.
-Function ctrl_atari_a$(init)
-  If Not init Then
+' Controller driver for SNES gamepad connected to PicoGAME VGA port A.
+Function ctrl_snes_a$(mode)
+  If Not mode Then
+    Local bits, i, s$
+
+    Pulse NES_A_LATCH, NES_PULSE!
+    For i = 0 To 11
+      If Not Pin(NES_A_DATA) Then bits=bits Or 2^i
+      Pulse NES_A_CLOCK, NES_PULSE!
+    Next
+
+    Select Case bits
+        Case 0 : Exit Function
+        Case &h01 : s$ = "fire-down"      ' Fire B
+        Case &h02 : s$ = "fire-left"      ' Fire Y
+        Case &h08 : s$ = "use-item"       ' Start
+        Case &h0C : s$ = "quit"           ' Start + Select
+        Case &h10 : s$ = "up"             ' Up
+        Case &h20 : s$ = "down"           ' Down
+        Case &h40 : s$ = "left"           ' Left
+        Case &h80 : s$ = "right"          ' Right
+        Case &h100 : s$ = "fire-right"    ' Fire A
+        Case &h200 : s$ = "fire-up"       ' Fire X
+        Case &h204 : s$ = "map"           ' Fire X + Select
+        Case &h400 : s$ = "search"        ' Left shoulder
+        Case &h404 : s$ = "toggle-item"   ' Left shoulder + Select
+        Case &h800 : s$ = "move"          ' Right shoulder
+        Case &h804 : s$ = "toggle-weapon" ' Right shoulder + Select
+    End Select
+
+    ctrl_snes_a$ = s$
+    Exit Function
+  ElseIf mode = 1 Then
+    SetPin NES_A_DATA, DIn
+    SetPin NES_A_LATCH, DOut
+    SetPin NES_A_CLOCK, DOut
+    ' SetPin GP14, DOut
+    Pin(GP14) = 1 ' Power for the NES controller - unnecessary ?
+  ElseIf mode = 2 Then
+    ctrl_snes_a$ = "SELECT + START"
+  EndIf
+End Function
+
+
+' Controller driver for Atari joystick connected to PicoGAME VGA port A.
+Function ctrl_atari_a$(mode)
+  If Not mode Then
     Local bits, s$
     Inc bits, Not Pin(GP14)       ' Fire
     Inc bits, Not Pin(GP0) * &h02 ' Up
@@ -2225,15 +2339,17 @@ Function ctrl_atari_a$(init)
 
     ctrl_atari_a$ = s$
     Exit Function
-  Else
+  ElseIf mode = 1 Then
     SetPin GP0, DIn : SetPin GP1, DIn : SetPin GP2, DIn : SetPin GP3, DIn : SetPin GP14, DIn
+  ElseIf mode = 2 Then
+    ctrl_atari_a$ = "ESCAPE"
   EndIf
 End Function
 
 
-  ' Controller driver for Wii Classic gamepad.
-Function ctrl_wii_classic$(init)
-  If Not init Then
+' Controller driver for Wii Classic gamepad.
+Function ctrl_wii_classic$(mode)
+  If Not mode Then
     Local bits, i, s$
     bits = Device(Wii b)
     If bits Then
@@ -2264,19 +2380,22 @@ Function ctrl_wii_classic$(init)
 
     ctrl_wii_classic$ = s$
     Exit Function
-  Else
+  ElseIf mode = 1 Then
     Device Wii Open
+  ElseIf mode = 2 Then
+    ctrl_wii_classic$ = "SELECT"
   EndIf
 End Function
 
 
 Function quit_keys$()
-  Select Case CTRL_DRIVER$
-    Case "ctrl_gamemite$" : quit_keys$ = "A+B"
-    Case "ctrl_nes_a$", "ctrl_wii_classic" : quit_keys$ = "SELECT"
-    Case Else : quit_keys$ = "ESCAPE"
-  End Select
+  If keyboard Then
+    quit_keys$ = Choice(USE_PS2, ctrl_ps2$(2), ctrl_inkey$(2))
+  Else
+    quit_keys$ = Call(ctrl$, 2)
+  EndIf
 End Function
+
 
   ' Use a function to save 256 bytes of heap that a string would take.
 Function path$(f$)
@@ -2285,37 +2404,6 @@ Function path$(f$)
       Case Else: path$ = Mm.Info(path)
   End Select
   If Len(f$) Then Cat path$, "/" + f$
-End Function
-
-
-  ' Reads property from config (.ini) file.
-  '
-  ' @param  key$      case-insensitive key for property to lookup.
-  ' @param  default$  value to return if property or file is not present.
-  ' @param  file$     file to read. If empty then read "A:/.spconfig", or
-  '                   if that is not present "A:/.config".
-Function sys.get_config$(key$, default$, file$)
-  sys.get_config$ = default$
-  If file$ = "" Then
-    Const file_$ = Choice(Mm.Info(Exists file "A:/.spconfig"), "A:/.spconfig", "A:/.config")
-  Else
-    Const file_$ = file$
-  EndIf
-  If Not Mm.Info(Exists file file_$) Then Exit Function
-
-  Local key_$ = LCase$(key$), s$, v$
-  Open file_$ For Input As #1
-  Do While Not Eof(#1)
-    Line Input #1, s$
-    If LCase$(Field$(Field$(s$, 1, "=", Chr$(34)),1, "#;", Chr$(34))) = key_$ Then
-      v$ = Field$(Field$(s$, 2, "=", Chr$(34)), 1, "#;", Chr$(34))
-      If Left$(v$, 1) = Chr$(34) Then v$ = Mid$(v$, 2)
-      If Right$(v$, 1) = Chr$(34) Then v$ = Mid$(v$, 1, Len(v$) - 1)
-      sys.get_config$ = v$
-      Exit Do
-    EndIf
-  Loop
-  Close #1
 End Function
 
 
@@ -2328,10 +2416,11 @@ colors:
 
   '
 map_names:
-  Data "01-research lab","02-headquarters","03-the village","04-the islands"
-  Data "05-downtown","06-pi university","07-more islands","08-robot hotel"
-  Data "09-forest moon","10-death tower","11-river death","12-bunker"
-  Data "13-castle robot","14-rocket center"
+  Data "01-research lab ", "02-headquarters ", "03-the village  "
+  Data "04-the islands  ", "05-downtown     ", "06-pi university"
+  Data "07-more islands ", "08-robot hotel  ", "09-forest moon  "
+  Data "10-death tower  ", "11-river death  ", "12-bunker       "
+  Data "13-castle robot ", "14-rocket center"
 
   ' C64_PetsciiRobotsFont  Martin Herhaus
   ' Font type    : Full (96 Characters)
