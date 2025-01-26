@@ -4,7 +4,7 @@
   Option Explicit
   Option Default Integer
 
-  Const VERSION = 100206 ' 1.0 RC 6
+  Const VERSION = 100301 ' 1.0.1
 
   If Mm.Device$ = "MMB4L" Then
     Option Simulate "PicoMiteVGA"
@@ -59,7 +59,7 @@
 
   'screen setup
   If LCD_DISPLAY Then FRAMEBUFFER Create Else Mode 2
-  game.init_window("Attack of the PETSCII Robots for MMBasic", VERSION, " sp")
+  game.init_window("Attack of the PETSCII Robots for MMBasic", VERSION, ".mmb4l")
   FRAMEBUFFER layer 9 'color 9 is transparant
   Font 9
 
@@ -122,7 +122,7 @@
   If LCD_DISPLAY Then FrameBuffer Merge 9
 
   'start music/sfx modfile
-  Dim music=1
+  Dim music_on=1
   select_music(map_nr mod 3)
 
   'write initial world
@@ -290,11 +290,12 @@
           use_item()
         Case "toggle-music"
           k$="" ' Do we need this ?
-          Play stop:music=1-music
-          If music Then
-            select_music(3) 'only sfx
-          Else
+          Play stop
+          music_on = 1 - music_on
+          If music_on Then
             select_music(map_nr mod 3) 'any of 3 songs
+          Else
+            select_music(3) 'only sfx
           EndIf
       End Select
 
@@ -1978,7 +1979,7 @@ Sub show_intro
   '--- copyright notices etc
   Text 0,224,"      Use UP, DOWN & Space or START       ",,,,col(3)
   Local msg$ = String$(36,32)
-  Cat msg$, "Version " + sys.format_version$(VERSION) + " sp - "
+  Cat msg$, "Version " + sys.format_version$(VERSION) + ".mmb4l - "
   Cat msg$, "Original game by David Murray - "
   Cat msg$, "Port to MMBasic by Volhout, Martin H & friends - "
   Cat msg$, "Graphics by Piotr Radecki - "
@@ -2159,6 +2160,7 @@ End Function
 
 ' Keyboard driver using PS2.
 Function ctrl_ps2$(mode)
+  Static shift_down% = 0
   If Not mode then
     Local s$
     Select Case Mm.Info(PS2)
@@ -2173,12 +2175,14 @@ Function ctrl_ps2$(mode)
         Case &h23 : s$ = "fire-right"    ' d
         Case &h1D : s$ = "fire-up"       ' w
         Case &h1C : s$ = "fire-left"     ' a
-        Case &h3A : s$ = "move"          ' m
-        Case &h1A : s$ = "search"        ' z
+        Case &h3A : s$ = Choice(shift_down%, "toggle-music", "move") ' M or m
+        Case &h35, &h1A : s$ = "search"  ' y or z
         Case &hE072 : s$ = "down"
         Case &hE075 : s$ = "up"
         Case &hE06B : s$ = "left"
         Case &hE074 : s$ = "right"
+        Case &h12, &h59: shift_down% = 1
+        Case &hF012, &hF059: shift_down% = 0
     End Select
     ctrl_ps2$=s$
     Exit Function
