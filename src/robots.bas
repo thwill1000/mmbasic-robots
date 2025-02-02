@@ -14,15 +14,6 @@
   #Include "./splib/system.inc"
   #Include "./splib/game.inc"
 
-  ' Prevent sptrans removing functions that are CALLed.
-  '!dynamic_call ctrl_atari_a$
-  '!dynamic_call ctrl_gamemite$
-  '!dynamic_call ctrl_nes_a$
-  '!dynamic_call ctrl_none$
-  '!dynamic_call ctrl_ps2$
-  '!dynamic_call ctrl_snes_a$
-  '!dynamic_call ctrl_wii_classic$
-
   '!dynamic_call game.on_break
   sys.override_break("game.on_break")
 
@@ -36,21 +27,9 @@
   Const LCD_DISPLAY = Mm.Device$ = "PicoMite"
   Const SC$ = Choice(LCD_DISPLAY, "f", "n")
   Const MOD_BUFF_128K = 0 ' Set 1 if using smaller/128K mod buffer.
-  Const USE_PS2 = 1 ' Set 1 to read PS2 keyboard, or 0 to use INKEY$
 
-  ' Determine controller driver and initialise.
-  Dim ctrl$ = Choice(LCD_DISPLAY, "ctrl_gamemite$", "ctrl_snes_a$")
-  ' Uncomment one of these to override controller:
-  ' ctrl$ = "ctrl_atari_a$"      ' Atari Joystick on PicoGAME port A
-  ' ctrl$ = "ctrl_nes_a$"        ' NES gamepad on PicoGAME port A
-  ' ctrl$ = "ctrl_wii_classic$"  ' Wii Classic controller
-  On Error Ignore ' Don't fail if controller is not connected.
-  If Call(ctrl$, 1) <> "" Then
-    On Error Abort
-    Error "Unexpected return from controller driver"
-  EndIf
-  If Mm.ErrNo Then ctrl$ = "ctrl_none$"
-  On Error Abort
+  Dim gamepad_driver$, keyboard_driver$
+  ctrl_init()
 
   Dim DIFF_LEVELS$(3) Length 10 =("EASY      ","NORMAL    ","HARD      ", "DIFFICULTY")
 
@@ -2041,8 +2020,8 @@ End Sub
 Sub flush_input()
   Local k$
   Do
-    k$ = Choice(USE_PS2, ctrl_ps2$(), ctrl_inkey$())
-    If k$ = "" Then k$ = Call(ctrl$)
+    k$ = Call(keyboard_driver$)
+    If k$ = "" Then k$ = Call(gamepad_driver$)
   Loop Until k$ = ""
 End Sub
 
@@ -2090,9 +2069,9 @@ End Sub
 ' @param  z%  If <> 0 then return "" if previous call did not return empty string.
 Function read_input$(z%)
   Static last$
-  read_input$ = Choice(USE_PS2, ctrl_ps2$(), ctrl_inkey$())
+  read_input$ = Call(keyboard_driver$)
   If read_input$ = "" Then
-    read_input$ = Call(ctrl$)
+    read_input$ = Call(gamepad_driver$)
     If read_input$ <> "" Then keyboard = 0
   Else
     keyboard = 1
@@ -2112,6 +2091,35 @@ Function read_input$(z%)
 End Function
 
 
+' Identify and iitialise 'gamepad_driver$' and 'keyboard_driver$' according to
+' the platform.
+Sub ctrl_init()
+  ' Determine gamepad driver and initialise.
+  If Mm.Device$ = "PicoMite" Then
+    gamepad_driver$ = "ctrl_gamemite$"
+  ElseIf InStr(Mm.Device$, "USB") Then
+    gamepad_driver$ = "ctrl_usb$"
+  Else
+    gamepad_driver$ = "ctrl_snes_a$"
+  EndIf
+  ' ' Uncomment one of these to override controller:
+  ' gamepad_driver$ = "ctrl_atari_a$"      ' Atari Joystick on PicoGAME port A
+  ' gamepad_driver$ = "ctrl_nes_a$"        ' NES gamepad on PicoGAME port A
+  ' gamepad_driver$ = "ctrl_wii_classic$"  ' Wii Classic controller
+  On Error Ignore ' Don't fail if controller is not connected.
+  If Call(gamepad_driver$, 1) <> "" Then
+    On Error Abort
+    Error "Unexpected return from gamepad driver"
+  EndIf
+  If Mm.ErrNo Then gamepad_driver$ = "ctrl_none$"
+  On Error Abort
+
+  keyboard_driver$ = Choice(InStr(Mm.Device$, "USB"), "ctrl_keydown$", "ctrl_ps2$")
+  ' Uncomment to read keyboard with INKEY$
+  ' keyboard_driver$ = "ctrl_inkey$"
+End Sub
+
+
 ' Controller drivers -----------------------------------------------------------
 '
 ' These all take a 'mode' parameter:
@@ -2121,11 +2129,13 @@ End Function
 
 
 ' Dummy controller driver.
+'!dynamic_call ctrl_none$
 Function ctrl_none$(mode)
 End Function
 
 
 ' Keyboard driver using INKEY$.
+'!dynamic_call ctrl_inkey$
 Function ctrl_inkey$(mode)
   If Not mode Then
     Local s$
@@ -2158,7 +2168,42 @@ Function ctrl_inkey$(mode)
 End Function
 
 
-' Keyboard driver using PS2.
+' Keyboard driver using KEYDOWN.
+'!dynamic_call ctrl_keydown$
+Function ctrl_keydown$(mode)
+  If Not mode Then
+    Local s$
+    Select Case Keydown(1)
+        Case 0   : Exit Function
+        Case 9   : s$ = "map"          ' Tab
+        Case 27  : s$ = "quit"         ' Escape
+        Case 32  : s$ = "use-item"     ' Space
+        Case 77  : s$ = "toggle-music" ' M
+        Case 97  : s$ = "fire-left"    ' a
+        Case 100 : s$ = "fire-right"   ' d
+        Case 109 : s$ = "move"         ' m
+        Case 115 : s$ = "fire-down"    ' s
+        Case 119 : s$ = "fire-up"      ' w
+        Case 121, 122 : s$ = "search"  ' y, z
+        Case 128 : s$ = "up"
+        Case 129 : s$ = "down"
+        Case 130 : s$ = "left"
+        Case 131 : s$ = "right"
+        Case 145 : s$ = "toggle-weapon" ' F1
+        Case 146 : s$ = "toggle-item"   ' F2
+        Case 147 : s$ = "cheat"         ' F3
+        Case 148 : s$ = "kill-all"      ' F4
+    End Select
+    ctrl_keydown$ = s$
+    Exit Function
+  ElseIf mode = 2 Then
+    ctrl_keydown$= "ESCAPE"
+  EndIf
+End Function
+
+
+' Keyboard driver using MM.INFO(PS2).
+'!dynamic_call ctrl_ps2$
 Function ctrl_ps2$(mode)
   Static shift_down% = 0
   If Not mode then
@@ -2191,10 +2236,12 @@ Function ctrl_ps2$(mode)
   EndIf
 End Function
 
+
 ' Controller driver for Game*Mite.
+'!dynamic_call ctrl_gamemite$
 Function ctrl_gamemite$(mode)
   If Not mode Then
-    Local bits = Inv Port(GP8, 8) And &hFF, s$
+    Const bits = Inv Port(GP8, 8) And &hFF, s$
 
     Select Case bits
         Case 0    : Exit Function
@@ -2231,6 +2278,7 @@ End Function
 
 
 ' Controller driver for NES gamepad connected to PicoGAME VGA port A.
+'!dynamic_call ctrl_nes_a$
 Function ctrl_nes_a$(mode)
   If Not mode Then
     Local bits, i, s$
@@ -2275,6 +2323,7 @@ End Function
 
 
 ' Controller driver for SNES gamepad connected to PicoGAME VGA port A.
+'!dynamic_call ctrl_snes_a$
 Function ctrl_snes_a$(mode)
   If Not mode Then
     Local bits, i, s$
@@ -2318,7 +2367,117 @@ Function ctrl_snes_a$(mode)
 End Function
 
 
+' Dummy controller for USB gamepad, should only be called in mode 1 and will
+' then identify/initialise the actual USB gamepad and reset 'gamepad_driver$'
+' appropriately.
+'!dynamic_call ctrl_usb$
+Function ctrl_usb$(mode)
+  If mode <> 1 Then Error "Invalid parameter"
+  Const g$ = get_usb_gamepad$
+  If Not Len(g$) Then Error "USB gamepad not found"
+  gamepad_driver$ = Field$(g$, 2, ",")
+  ctrl_usb$ = Call(gamepad_driver$, 1)
+End Function
+
+
+' Gets the id and driver for the first USB gamepad found.
+'
+' @return  A string of the form "<id>,<gamepad_driver>"
+Function get_usb_gamepad$()
+  Local i%
+  For i% = 1 To 4
+    Print i%, Mm.Info(Usb i%)
+    Select Case Mm.Info(Usb i%)
+      Case 128, 129: get_usb_gamepad_id$ = Str$(i%) + ",ctrl_usb_ps3$"
+      Case 130: get_usb_gamepad_id% = Str$(i%) + ",ctrl_usb_generic$"
+    End Select
+    If Len(get_usb_gamepad$) Then Exit Function
+  Next
+End Function
+
+
+' Controller driver for Playstation 3/4 USB gamepad 1.
+'!dynamic_call ctrl_usb_ps3$
+Function ctrl_usb_ps3$(mode)
+  Static usb_channel% = 0 ' The channel of the first USB controller found.
+  If Not mode Then
+    Local s$
+    Const bits% = Device(Gamepad usb_channel%, B)
+    If bits% Then
+      Select Case bits%
+          Case &h0001 : s$ = "toggle-item"   ' Right shoulder
+          Case &h0002 : s$ = "use-item"      ' Start
+          Case &h0004 : s$ = "map"           ' Home
+          Case &h0008 : s$ = "quit"          ' Select
+          Case &h0010 : s$ = "toggle-weapon" ' Left shoulder
+          Case &h0020 : s$ = "fire-down"     ' Cursor down
+          Case &h0040 : s$ = "fire-right"    ' Cursor right
+          Case &h0080 : s$ = "fire-up"       ' Cursor up
+          Case &h0100 : s$ = "fire-left"     ' Cursor left
+          Case &h0800 : s$ = "move"          ' Fire A
+          Case &h2000 : s$ = "search"        ' Fire B
+      End Select
+    Else
+      ' Right analog joystick.
+      Select Case Device(Gamepad usb_channel%, RY)
+          Case < 50  : s$ = "up"
+          Case > 205 : s$ = "down"
+      End Select
+      Select Case Device(Gamepad usb_channel%, RX)
+          Case < 50  : s$ = "left"
+          Case > 205 : s$ = "right"
+      End Select
+    EndIf
+    ctrl_usb_ps3$ = s$
+    Exit Function
+  ElseIf mode = 1 Then
+    Const g$ = get_usb_gamepad$()
+    If Field$(g$, 2, ",") <> "ctrl_usb_ps3$" Then Error "PS3 or equivalent gamepad not found"
+    usb_channel% = Val(Field$(g$, 1, ","))
+  ElseIf mode = 2 Then
+    ctrl_usb_ps3$ = "SELECT"
+  EndIf
+End Function
+
+
+' Controller driver for Generic USB gamepad 1.
+'!dynamic_call ctrl_usb_generic$
+Function ctrl_usb_generic$(mode)
+  Static usb_channel% = 0 ' The channel of the first USB controller found.
+  If Not mode Then
+    Local s$
+    Select Case Device(Gamepad usb_channel%, b)
+        Case &h0001 : s$ = "move"          ' Right shoulder
+        Case &h0002 : s$ = "use-item"      ' Start
+        Case &h0004 : s$ = "map"           ' Home
+        Case &h0009 : s$ = "toggle-weapon" ' Right shoulder + Select
+        Case &h000A : s$ = "quit"          ' Start + Select
+        Case &h0010 : s$ = "search"        ' Left shoulder
+        Case &h0018 : s$ = "toggle-item"   ' Left shoulder + Select
+        Case &h0020 : s$ = "down"          ' Cursor down
+        Case &h0040 : s$ = "right"         ' Cursor right
+        Case &h0080 : s$ = "up"            ' Cursor up
+        Case &h0100 : s$ = "left"          ' Cursor left
+        Case &h0400 : s$ = "fire-up"       ' Fire X
+        Case &h0408 : s$ = "map"           ' Fire X + Select
+        Case &h0800 : s$ = "fire-right"    ' Fire A
+        Case &h1000 : s$ = "fire-left"     ' Fire Y
+        Case &h2000 : s$ = "fire-down"     ' Fire B
+    End Select
+    ctrl_usb_generic$ = s$
+    Exit Function
+  ElseIf mode = 1 Then
+    Const g$ = get_usb_gamepad$()
+    If Field$(g$, 2, ",") <> "ctrl_usb_generic$" Then Error "Generic USB gamepad not found"
+    usb_channel% = Val(Field$(g$, 1, ","))
+  ElseIf mode = 2 Then
+    ctrl_usb_generic$ = "SELECT + START"
+  EndIf
+End Function
+
+
 ' Controller driver for Atari joystick connected to PicoGAME VGA port A.
+'!dynamic_call ctrl_atari_a$
 Function ctrl_atari_a$(mode)
   If Not mode Then
     Local bits, s$
@@ -2352,10 +2511,11 @@ End Function
 
 
 ' Controller driver for Wii Classic gamepad.
+'!dynamic_call ctrl_wii_classic$
 Function ctrl_wii_classic$(mode)
   If Not mode Then
-    Local bits, i, s$
-    bits = Device(Wii b)
+    Local s$
+    Const bits = Device(Wii B)
     If bits Then
       Select Case bits
           Case &h0001 : s$ = "toggle-item"   ' R shoulder button
@@ -2393,11 +2553,7 @@ End Function
 
 
 Function quit_keys$()
-  If keyboard Then
-    quit_keys$ = Choice(USE_PS2, ctrl_ps2$(2), ctrl_inkey$(2))
-  Else
-    quit_keys$ = Call(ctrl$, 2)
-  EndIf
+  quit_keys$ = Choice(keyboard, Call(keyboard_driver$, 2), Call(gamepad_driver$, 2))
 End Function
 
 
