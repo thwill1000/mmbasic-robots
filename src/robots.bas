@@ -803,7 +803,7 @@ End Sub
 
 Sub AI_units
   Static once
-  Local i,dx,dy,nearx,neary,xy,j
+  Local i,dx,dy,nearx,neary,xy,j,xof
 
   if em_on=0 then
     For i=0 To 27 'units
